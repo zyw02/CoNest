@@ -37,3 +37,4 @@ __pycache__/
 
 # Downloaded and verified development SDK; never commit dependency contents.
 /.vendor/
+apply_fixes.py

@@ -87,6 +87,7 @@ export class BridgeClient {
     child.stdin.on('error', error => this.fail(child, error));
     child.once('error', error => this.fail(child, error));
     child.once('exit', (code, signal) => {
+      errors.close();
       if (this.child !== child) return;
       const message = `CoNest Runtime process exited${signal ? ` from ${signal}` : ` with code ${code ?? 'unknown'}`}; an interrupted call was not replayed`;
       this.rejectPending(new BridgeError('BRIDGE_EXITED', message));
@@ -97,7 +98,6 @@ export class BridgeClient {
         this.failure = message;
         this.options.onFailure?.(message);
       }
-      errors.close();
     });
     try {
       const status = await this.request<RuntimeStatus>('status', undefined, this.options.startupTimeoutMs);
@@ -143,7 +143,7 @@ export class BridgeClient {
       });
     } finally {
       this.progress.delete(input.callId);
-      if (this.child) await this.request('release', { authorization: grant.token }, 1_000).catch(() => {});
+      if (this.child) void this.request('release', { authorization: grant.token }, 1_000).catch(() => {});
     }
   }
 
