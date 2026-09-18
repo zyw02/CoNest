@@ -113,7 +113,16 @@ Uninstall removes the component from the configuration and live catalog. Old sna
 
 ## Component contract and lifecycle
 
-[examples/source-verifier](./examples/source-verifier/component.json) is a complete independently installable example. Its manifest declares `requires: {"dsh-search":"^0.2.0"}` and publishes `source_verify`; it is not hardcoded in the adapter.
+The `bridge/examples/` directory contains independently installable example components:
+
+| Example | Capabilities | Notes |
+| --- | --- | --- |
+| [source-verifier](./examples/source-verifier/component.json) | `source_verify` | Declares `requires: {"dsh-search":"^0.2.0"}`; demonstrates cross-component dependency and invocation. |
+| [git-inspector](./examples/git-inspector/component.json) | `git_status`, `git_log`, `git_diff` | Git repository inspection via `spawnSync` (direct binary execution, no shell). Demonstrates subprocess-free component pattern. |
+| [web-fetch](./examples/web-fetch/component.json) | `fetch_url` | Fetch a URL and extract clean text. Demonstrates outbound HTTP via Node built-in `https`. |
+| [system-info](./examples/system-info/component.json) | `system_metrics`, `top_processes` | CPU/memory/disk metrics via `/proc` and `spawnSync`. Demonstrates host introspection. |
+
+Each example is a self-contained bundle with `component.json` (manifest) and `component.mjs` (ESM entry). They are not hardcoded in the adapter; install them through the management API or reference their manifest directly in config.
 
 A manifest declares `id`, semantic `version`, `description`, `entry`, required component version ranges, and capability descriptors. Optional `bridgeVersion`, `configSchema`, and per-capability `outputSchema` are validated. `bridge_capabilities` and `bridge_invoke` are reserved names. Discovery reads declarative JSON and hashes bundle content without executing component code.
 

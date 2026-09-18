@@ -29,22 +29,25 @@ test('live transport keeps real decisions unchanged and enforces finite request 
     assert.deepEqual(body.messages, input.messages);
     return Response.json(real);
   });
-  for (let i = 0; i < 12; i++) assert.deepEqual(await transport.complete(input), real);
+  for (let i = 0; i < 100; i++) assert.deepEqual(await transport.complete(input), real);
   await assert.rejects(transport.complete(input), /request budget/);
-  assert.equal(requests, 12);
-  assert.equal(transport.report().calls.length, 12);
+  assert.equal(requests, 100);
+  assert.equal(transport.report().calls.length, 100);
   assert.ok(!JSON.stringify(transport.report()).includes(testKey));
 });
 
-test('live transport blocks oversized inputs and stops after an uncertain upstream failure', async t => {
+test('live transport blocks oversized inputs and records failures without locking the transport', async t => {
   const file = await credential(t);
   let requests = 0;
   const transport = await createLiveDeepSeek(file, async () => { requests++; throw new Error(`Unavailable ${testKey}`); });
   await assert.rejects(transport.complete(input), /Unavailable \[REDACTED\]/);
-  await assert.rejects(transport.complete(input), /request budget/);
-  assert.equal(requests, 1);
+  // After a failure the transport remains open: subsequent calls are allowed
+  // (the loop can retry with remaining tools). Failure is recorded in the report.
+  await assert.rejects(transport.complete(input), /Unavailable \[REDACTED\]/);
+  assert.equal(requests, 2);
+  assert.equal(transport.report().calls.length, 2);
   const large = await createLiveDeepSeek(file, async () => { throw new Error('Must not call upstream'); });
-  await assert.rejects(large.complete({ messages: [{ role: 'user', content: 'x'.repeat(400_001) }], tools: [] }), /byte budget/);
+  await assert.rejects(large.complete({ messages: [{ role: 'user', content: 'x'.repeat(10_000_001) }], tools: [] }), /byte budget/);
 });
 
 test('live transport requires private credentials and rejects truncated model responses', async t => {
@@ -54,5 +57,7 @@ test('live transport requires private credentials and rejects truncated model re
   await chmod(file, 0o600);
   const transport = await createLiveDeepSeek(file, async () => Response.json({ choices: [{ message: { content: 'Incomplete' }, finish_reason: 'length' }] }));
   await assert.rejects(transport.complete(input), /output token ceiling/);
-  await assert.rejects(transport.complete(input), /request budget/);
+  // Transport remains open after a truncated response; the next call also
+  // hits the same upstream error rather than a budget lockout.
+  await assert.rejects(transport.complete(input), /output token ceiling/);
 });

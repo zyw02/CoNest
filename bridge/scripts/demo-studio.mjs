@@ -59,7 +59,7 @@ const model=createServer(async(req,res)=>{try{
  requests.push({at:new Date().toISOString(),userText:originalTask,offered,results:results.map(text),decision:output.choices[0].message});
  if(input.stream){res.writeHead(200,{'content-type':'text/event-stream'});let delta=output.choices[0].message;if(delta.tool_calls)delta={...delta,tool_calls:delta.tool_calls.map((c,index)=>({...c,index}))};for(const [d,finish] of [[delta,null],[{},output.choices[0].finish_reason]])res.write('data: '+JSON.stringify({id:output.id,object:'chat.completion.chunk',model:output.model,choices:[{index:0,delta:d,finish_reason:finish}],...(finish?{usage:output.usage}:{})})+'\n\n');res.end('data: [DONE]\n\n');}
  else{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(output));}
-}catch(e){res.writeHead(500,{'content-type':'application/json'});res.end(JSON.stringify({error:{message:String(e)}}));}});
+}catch(e){console.error('[model-proxy] error:', e.message);res.writeHead(500,{'content-type':'application/json'});res.end(JSON.stringify({error:{message:String(e)}}));}});
 await new Promise(resolve=>model.listen(0,'127.0.0.1',resolve));const modelPort=model.address().port;
 const port=Number(process.env.CONEST_DEMO_PORT??18791);
 const config={logging:{file:path.join(demoRoot,'gateway.log')},gateway:{mode:'local',bind:'loopback',port,auth:{mode:'token',token},controlUi:{enabled:true,allowedOrigins:[`http://127.0.0.1:${port}`,`http://localhost:${port}`]}},
