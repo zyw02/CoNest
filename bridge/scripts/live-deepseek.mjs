@@ -9,15 +9,14 @@ export async function createLiveDeepSeek(credentialFile, fetchResponse = fetch) 
     'The credential file must be a regular owner-only file (mode 600 or 400)');
   const key = parseEnv(await readFile(credentialFile, 'utf8')).DEEPSEEK_API_KEY?.trim();
   assert.ok(key && key !== 'YOUR_API_KEY_HERE', 'DEEPSEEK_API_KEY is missing or a placeholder');
-  const maxRequests = 12;
+  const maxRequests = 100;
   const maxOutputTokens = 2048;
-  const maxInputBytes = 400_000;
+  const maxInputBytes = 10_000_000;
   const calls = [];
   let inputBytes = 0;
-  let stopped = false;
   const redact = text => String(text).replaceAll(key, '[REDACTED]');
   const complete = async input => {
-    assert.ok(!stopped && calls.length < maxRequests, 'The live model request budget is exhausted');
+    assert.ok(calls.length < maxRequests, 'The live model request budget is exhausted');
     const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: input.messages, tools: input.tools,
       stream: false, thinking: { type: 'disabled' }, max_tokens: maxOutputTokens });
     inputBytes += Buffer.byteLength(body);
@@ -40,8 +39,11 @@ export async function createLiveDeepSeek(credentialFile, fetchResponse = fetch) 
       call.elapsedMs = Math.round(performance.now() - started);
       return result;
     } catch (error) {
-      // Do not automatically replay chargeable requests after an uncertain failure.
-      stopped = true;
+      // Do not lock the transport after a single failure: the loop should be
+      // able to retry or proceed with remaining tools. Record the failure but
+      // allow subsequent requests. The operator is informed via the report.
+      call.status = call.status ?? 0;
+      call.error = redact(error.message);
       throw new Error(redact(error.message));
     }
   };

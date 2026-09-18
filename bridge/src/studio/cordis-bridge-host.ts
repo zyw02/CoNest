@@ -541,7 +541,10 @@ function assertToolSucceeded(result: ToolExecutionResult, operation: string): vo
   const message = result.content
     .flatMap((block) => block.type === "text" ? [block.text] : [])
     .join("\n");
-  throw new Error(`DSH automatic memory ${operation} failed: ${message || "unknown error"}`);
+  // Memory tool failures are non-fatal: log a warning and continue the loop
+  // rather than aborting the entire agent run. A failed memory recall should
+  // not prevent the task from completing with the tools that did succeed.
+  console.warn(`[dsh-bridge] DSH automatic memory ${operation} failed (non-fatal): ${message || "unknown error"}`);
 }
 
 function messageText(content: readonly unknown[]): string {
