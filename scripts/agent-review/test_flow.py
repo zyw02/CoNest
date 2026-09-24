@@ -95,6 +95,8 @@ class FlowTests(unittest.TestCase):
                 self.assertEqual(shlex.split(command)[-1],name)
                 with self.assertRaises(ValueError):Workspace(root).call('run_test',{'path':name})
                 with self.assertRaises(ValueError):Workspace(root,True).call('run_test',{'path':'scripts/build.mjs'})
+                (root/'.git').mkdir();(root/'.git/MERGE_HEAD').write_text('pending')
+                with self.assertRaisesRegex(ValueError,'Finish conflict'):Workspace(root,True).call('run_test',{'path':name})
                 self.assertEqual(tests.call_count,1)
 
     def test_paths_cannot_escape_or_modify_policy(self):

@@ -66,6 +66,7 @@ class Workspace:
             return {'total_lines':len(lines),'content':'\n'.join(f'{i+1}: {l}' for i,l in enumerate(lines) if start-1<=i<start-1+count)}
         if name == 'run_test':
             if not self.editable:raise ValueError('Review workers cannot run code')
+            if (self.root/'.git/MERGE_HEAD').exists():raise ValueError('Finish conflict resolution first; the controller prepares dependencies before the test and repair stages')
             name=a['path'];p=self.path(name)
             if not p.is_file() or not name.startswith('test/') or not name.endswith(('.test.ts','.test.mjs')):raise ValueError('Select an existing test/*.test.ts or test/*.test.mjs file')
             import runner
@@ -100,7 +101,7 @@ class Workspace:
             p.parent.mkdir(parents=True,exist_ok=True);p.write_text(a['content']);return 'created'
         raise ValueError('Unknown tool')
 
-def tools(editable):
+def tools(editable, testing=True):
     specs=[('list_files','List source paths; optional contains filter',{'contains':{'type':'string'}},[]),
            ('read_file','Read numbered source lines',{'path':{'type':'string'},'start':{'type':'integer'},'count':{'type':'integer'}},['path']),
            ('search','Search literal text in source files',{'text':{'type':'string'},'path_contains':{'type':'string'}},['text']),
@@ -109,7 +110,7 @@ def tools(editable):
            ('read_revision','Read original PR or base source before conflict resolution',{'path':{'type':'string'},'revision':{'type':'string','enum':['base','pr']},'start':{'type':'integer'},'count':{'type':'integer'}},['path','revision'])]
     if editable:specs += [('edit_file','Replace one exact source fragment',{'path':{'type':'string'},'old':{'type':'string'},'new':{'type':'string'}},['path','old','new']),('create_file','Create a new source or regression test file',{'path':{'type':'string'},'content':{'type':'string'}},['path','content'])]
     if editable:specs += [('run_test','Build and run one existing regression test file in the isolated test environment. No arbitrary commands, network access, or operator credentials.',{'path':{'type':'string'}},['path']),('restore_base','Restore one path from the pinned base; removes the path if absent there. Use only after confirming that this preserves the contribution.',{'path':{'type':'string'}},['path']),('delete_file','Delete an obsolete source file',{'path':{'type':'string'}},['path'])]
-    return [{'name':n,'description':d,'inputSchema':{'type':'object','properties':p,'required':r,'additionalProperties':False},'annotations':{'readOnlyHint':n not in ('edit_file','create_file','delete_file','restore_base','run_test'),'openWorldHint':False}} for n,d,p,r in specs]
+    return [{'name':n,'description':d,'inputSchema':{'type':'object','properties':p,'required':r,'additionalProperties':False},'annotations':{'readOnlyHint':n not in ('edit_file','create_file','delete_file','restore_base','run_test'),'openWorldHint':False}} for n,d,p,r in specs if testing or n!='run_test']
 
 def main():
     w=Workspace(sys.argv[1],len(sys.argv)>2 and sys.argv[2]=='edit')
@@ -120,7 +121,7 @@ def main():
             if 'id' not in req:continue
             m=req['method']
             if m=='initialize':result={'protocolVersion':req['params']['protocolVersion'],'capabilities':{'tools':{}},'serverInfo':{'name':'conest-source','version':'1.0'}}
-            elif m=='tools/list':result={'tools':tools(w.editable)}
+            elif m=='tools/list':result={'tools':tools(w.editable,not (w.root/'.git/MERGE_HEAD').exists())}
             elif m=='tools/call':
                 try:
                     val=w.call(req['params']['name'],req['params'].get('arguments',{}))
