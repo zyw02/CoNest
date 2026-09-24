@@ -32,6 +32,12 @@ class State(TypedDict, total=False):
     status: str
     error: str
     merge_sha: str
+    seed: str
+
+
+def confirmed_publish(s,pr):
+    review=s.get('review',{})
+    return s.get('test_ok') is True and review.get('coverage_complete') is True and review.get('findings')==[] and s.get('code')==pr['head']['sha']
 
 
 def route_review(s):
@@ -63,18 +69,23 @@ class Operations:
         op.comment(self.c,s['pr']['number'],status,body)
 
     def checkpoint_source(self,s,label):
-        return op.commit_changes(self.c,self.work,s['pr'],s['trailers'],f'fix: {label} for PR #{s["pr"]["number"]}')
+        code=op.commit_changes(self.c,self.work,s['pr'],s['trailers'],f'fix: {label} for PR #{s["pr"]["number"]}')
+        protected=op.git(self.work,'diff','--name-only',s['base'],'HEAD','--','.github','AGENTS.md','SECURITY.md','scripts/agent-review','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','.npmrc','.pnpmfile.cjs','scripts/maintenance/bootstrap.mjs','scripts/maintenance/sdk.lock.json').stdout.strip()
+        if protected:raise RuntimeError('Automation policy changes require maintainer review: '+protected)
+        return code
 
     def model(self,s,label,prompt,edit=False):
         c={**self.c,'review_head':s['head']}
+        diagnostic=self.c.get('diagnostics',{}).get(str(s['pr']['number']),'')
+        if diagnostic:prompt+='\nMaintainer diagnostic evidence (validate against current source):\n'+diagnostic[:6000]
         return op.codex(c,self.work,s['base'],op.POLICY+'\n'+prompt,Path(s['job'])/label,edit)
 
     def prepare(self,s):
         job=Path(s['job']);receipt=job/'checkout.json'
         if receipt.exists():return json.loads(receipt.read_text())
-        work,base=op.prepare(self.c,s['pr'],job)
+        work,base=op.prepare({**self.c,'start_commit':s.get('seed')},s['pr'],job)
         trailers=op.credit(s['pr'],op.pages(f'repos/{self.c["repo"]}/pulls/{s["pr"]["number"]}/commits'))
-        out={'base':base,'branch':op.git(work,'branch','--show-current').stdout.strip(),'trailers':trailers,'code':s['head'],'cycle':0,'status':'reconciling'}
+        out={'base':base,'branch':op.git(work,'branch','--show-current').stdout.strip(),'trailers':trailers,'code':op.git(work,'rev-parse','HEAD').stdout.strip(),'cycle':0,'status':'reconciling'}
         op.save(receipt,out)
         self.note(s,'reviewing',f'Reviewing `{s["head"]}` against `{base}` in the shared automation workspace.')
         return out
@@ -144,7 +155,7 @@ class Operations:
             if not related and live['title'].startswith('feat'):raise RuntimeError('Feature PR needs a related issue or PR before automated merge')
             if not related:related='None — standalone corrective change described in the original contribution.'
             quoted='\n'.join('> '+line for line in original.splitlines()) or '> No original description was supplied.'
-            body='## Problem\n\nOriginal contributor description:\n\n'+quoted+'\n\n## Changes\n\n'+s['review']['summary']+'\n\n## Validation\n\n'+evidence+'\n\n## Compatibility and risks\n\nThe contribution has been reconciled with the current target branch. Source review covered the affected contracts and callers. Remaining review limits: '+('; '.join(s['review']['limitations']) or 'No additional source-review coverage gaps reported.')+'\n\n## Related issues\n\n'+related+'\n\n## Checklist\n\n- [x] The integrated diff was reviewed.\n- [x] Configured local validation passed on the stated revision.\n- [x] Original contributor attribution is retained.\n- [x] Actual validation and remaining limits are stated.\n'
+            body='## Problem\n\nOriginal contributor description:\n\n'+quoted+'\n\n## Changes\n\n'+s['review'].get('change_summary',s['review']['summary'])+'\n\n## Validation\n\n'+evidence+'\n\n## Compatibility and risks\n\nThe contribution has been reconciled with the current target branch. Source review covered the affected contracts and callers. Remaining review limits: '+('; '.join(s['review']['limitations']) or 'No additional source-review coverage gaps reported.')+'\n\n## Related issues\n\n'+related+'\n\n## Checklist\n\n- [x] The integrated diff was reviewed.\n- [x] Configured local validation passed on the stated revision.\n- [x] Original contributor attribution is retained.\n- [x] Actual validation and remaining limits are stated.\n'
         op.gh(f'repos/{self.c["repo"]}/pulls/{live["number"]}','PATCH',{'body':body})
 
     def publish(self,s):
@@ -157,8 +168,12 @@ class Operations:
         live=op.current(self.c,s['pr']['number'])
         if live['head']['sha']!=final:
             op.push(self.c,self.work,s['pr'],s['base'])
-        live=op.current(self.c,s['pr']['number'])
-        if live['head']['sha']!=final:raise RuntimeError('Remote head does not match validated commit')
+        for attempt in range(15):
+            live=op.current(self.c,s['pr']['number'])
+            if live['head']['sha']==final:break
+            if live['head']['sha']!=s['head']:raise RuntimeError('Another commit appeared after push')
+            time.sleep(2)
+        else:raise RuntimeError('GitHub has not yet confirmed the pushed revision')
         self.note(s,'waiting for CI',f'Repairs pushed to the original PR: `{final}`. Isolated local checks and source re-review passed.\n\n'+s['review']['summary']+f'\n\nOriginal contribution by @{s["pr"]["user"]["login"]}; co-author credit is retained.')
         return {'final':final,'status':'waiting for CI'}
 
@@ -166,6 +181,15 @@ class Operations:
         if not self.c['publish'] or not self.c['merge']:return {'status':'done'}
         live=self.check(s)
         if live.get('merged'):return {'status':'merged','merge_sha':live['merge_commit_sha']}
+        allowed={'.github/workflows/repository.yml','.github/workflows/review.yml','.github/workflows/contribution.yml'}
+        runs=op.gh(f'repos/{self.c["repo"]}/actions/runs?head_sha={s["final"]}&event=pull_request&per_page=100')['workflow_runs']
+        pending=[run for run in runs if run['head_sha']==s['final'] and run.get('conclusion')=='action_required' and run['path'] in allowed]
+        if pending:
+            files=op.pages(f'repos/{self.c["repo"]}/pulls/{s["pr"]["number"]}/files')
+            if any(f['filename'].startswith('.github/') for f in files):raise RuntimeError('Cannot approve CI for modified workflows automatically')
+            for run in pending:op.gh(f'repos/{self.c["repo"]}/actions/runs/{run["id"]}/approve','POST')
+            interrupt({'status':'CI approved; waiting for checks','head':s['final']})
+            return {'status':'poll CI'}
         refs={s['final'],live.get('merge_commit_sha')};checks=[]
         for ref in refs-{None}:
             checks+=op.gh(f'repos/{self.c["repo"]}/commits/{ref}/check-runs?per_page=100')['check_runs']
@@ -250,12 +274,28 @@ def main():
         except BlockingIOError:return
         with SqliteSaver.from_conn_string(str(state/'checkpoints.sqlite')) as saver:
             graph=build(Operations(c),saver)
+            if op.git(c['workspace'],'status','--porcelain').stdout.strip():
+                active=op.git(c['workspace'],'branch','--show-current').stdout.strip();owner=None
+                for candidate in prs:
+                    record=state/f'pr-{candidate["number"]}.json'
+                    if not record.exists():continue
+                    entry=json.loads(record.read_text())
+                    if not entry.get('thread'):continue
+                    snapshot=graph.get_state({'configurable':{'thread_id':entry['thread']}}).values
+                    if snapshot.get('branch')==active and entry.get('status')=='running':owner=candidate['number'];break
+                if owner is None:
+                    print('Unfinished workspace changes have no active queue owner; waiting for recovery',flush=True);return
+                prs.sort(key=lambda p:(p['number']!=owner,p['number']))
             for pr in prs:
                 path=state/f'pr-{pr["number"]}.json';previous=json.loads(path.read_text()) if path.exists() else {}
                 base=op.base_sha(c,pr)
                 snapshot_code=None
                 if previous.get('thread'):
-                    snapshot_code=graph.get_state({'configurable':{'thread_id':previous['thread']}}).values.get('code')
+                    prior_config={'configurable':{'thread_id':previous['thread']}}
+                    prior=graph.get_state(prior_config).values;snapshot_code=prior.get('code')
+                    if previous.get('status')=='blocked' and previous.get('error') in ('Remote head does not match validated commit','GitHub has not yet confirmed the pushed revision') and confirmed_publish(prior,pr):
+                        graph.update_state(prior_config,{'final':snapshot_code,'status':'waiting for CI','error':''},as_node='publish')
+                        previous.update(final=snapshot_code,status='waiting for CI',error=None,key=snapshot_code+':'+previous['base']);op.save(path,previous)
                 resumable=previous.get('status') in ('running','waiting for CI') and pr['head']['sha'] in (previous.get('head'),previous.get('final'),snapshot_code) and base==previous.get('base')
                 key=pr['head']['sha']+':'+base
                 if not a.retry and previous.get('key')==key and previous.get('status') in ('blocked','done','local complete','merged'):continue
@@ -272,7 +312,15 @@ def main():
                         print('Workspace contains unfinished changes; waiting for recovery',flush=True);break
                     thread=f'pr-{pr["number"]}-{time.time_ns()}';job=state/'jobs'/thread;job.mkdir(parents=True)
                     cfg={'configurable':{'thread_id':thread},'recursion_limit':80}
+                    seed=None
+                    branch=previous.get('branch','')
+                    if branch.startswith(f'agent/pr-{pr["number"]}-') and pr['head']['sha'] in (previous.get('head'),previous.get('final')):
+                        ref=op.git(c['workspace'],'rev-parse','--verify','refs/heads/'+branch,check=False)
+                        if not ref.returncode:
+                            candidate=ref.stdout.strip()
+                            if not op.git(c['workspace'],'merge-base','--is-ancestor',pr['head']['sha'],candidate,check=False).returncode:seed=candidate
                     initial={'pr':pr,'head':pr['head']['sha'],'base':base,'job':str(job),'status':'running','cycle':0}
+                    if seed:initial['seed']=seed
                     previous={'key':key,'head':pr['head']['sha'],'base':base,'thread':thread,'job':str(job),'status':'running'};op.save(path,previous)
                 result=graph.invoke(initial,cfg,durability='sync')
                 final=graph.get_state(cfg).values
@@ -281,6 +329,7 @@ def main():
                 previous.update(status=status,final=final.get('final'),branch=final.get('branch'),error=final.get('error'),updated_at=time.time())
                 if final.get('final'):previous['key']=final['final']+':'+base
                 op.save(path,previous);print(f'PR #{pr["number"]}: {status}',flush=True)
+                if status=='waiting for CI':break
 
 
 if __name__=='__main__':main()
