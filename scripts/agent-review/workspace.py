@@ -10,7 +10,7 @@ class Workspace:
 
     def path(self, name, write=False):
         p = PurePosixPath(name)
-        if not name or p.is_absolute() or any(x in ('..', '.git', '.codex', '.local', '.vendor', 'node_modules') for x in p.parts):
+        if not name or p.is_absolute() or any(x in ('..', '.git', '.codex', '.local', '.vendor', '.pnpm-store', 'node_modules') for x in p.parts):
             raise ValueError('Path is outside the source workspace')
         dest = self.root.joinpath(*p.parts)
         if any(x.is_symlink() for x in [dest, *dest.parents] if x != self.root.parent):

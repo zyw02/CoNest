@@ -112,6 +112,9 @@ def codex(c,work,base,prompt,logdir,edit=False):
 
 def prepare(c,pr,job):
     work=Path(c['workspace']).resolve()
+    exclude=work/'.git/info/exclude'
+    if exclude.exists() and '\n.pnpm-store/\n' not in exclude.read_text():
+        with exclude.open('a') as f:f.write('\n.pnpm-store/\n')
     if not (work/'.git').is_dir():raise RuntimeError('Fixed automation checkout must be initialized first')
     if git(work,'status','--porcelain').stdout.strip():raise RuntimeError('Automation workspace has unfinished changes; refusing to switch branches')
     git(work,'fetch','origin',f'pull/{pr["number"]}/head')
@@ -137,7 +140,7 @@ def tests(c,work,job):
     # No HOME, Codex/GitHub credentials, host network, or other workspaces are mounted.
     argv=['bwrap','--die-with-parent','--new-session','--unshare-all','--ro-bind','/usr','/usr','--ro-bind','/bin','/bin','--ro-bind','/lib','/lib']
     if Path('/lib64').exists():argv+=['--ro-bind','/lib64','/lib64']
-    argv+=['--ro-bind',c['toolchain'],'/toolchain','--bind',str(work),'/work','--ro-bind',str(work/'.git'),'/work/.git','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--dir','/home/reviewer','--chdir','/work','--clearenv','--setenv','HOME','/home/reviewer','--setenv','PATH','/toolchain/bin:/usr/bin:/bin','--setenv','CI','1','--','/bin/sh','-c',c['test_command']]
+    argv+=['--ro-bind',c['toolchain'],'/toolchain','--bind',str(work),'/work','--ro-bind',str(work/'.git'),'/work/.git','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--dir','/home/reviewer','--chdir','/work','--clearenv','--setenv','HOME','/home/reviewer','--setenv','PATH','/toolchain/bin:/usr/bin:/bin','--setenv','CI','1','--setenv','npm_config_nodedir','/toolchain','--','/bin/sh','-c',c['test_command']]
     before=source_digest(work);p=run(argv,timeout=c['test_timeout'],check=False)
     if source_digest(work)!=before:raise RuntimeError('Test process changed tracked source files')
     (job/'tests.log').write_text(p.stdout+p.stderr)
@@ -153,7 +156,7 @@ def install_dependencies(c,work,job):
 def dependency_sandbox(c,work,job):
     argv=['bwrap','--die-with-parent','--new-session','--unshare-all','--share-net','--ro-bind','/usr','/usr','--ro-bind','/bin','/bin','--ro-bind','/lib','/lib']
     if Path('/lib64').exists():argv+=['--ro-bind','/lib64','/lib64']
-    argv+=['--ro-bind','/etc/resolv.conf','/etc/resolv.conf','--ro-bind','/etc/ssl','/etc/ssl','--ro-bind',c['toolchain'],'/toolchain','--bind',str(work),'/work','--ro-bind',str(work/'.git'),'/work/.git','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--dir','/home/reviewer','--chdir','/work','--clearenv','--setenv','HOME','/home/reviewer','--setenv','PATH','/toolchain/bin:/usr/bin:/bin','--setenv','CI','1','--','/bin/sh','-c',c['test_command']]
+    argv+=['--ro-bind','/etc/resolv.conf','/etc/resolv.conf','--ro-bind','/etc/ssl','/etc/ssl','--ro-bind',c['toolchain'],'/toolchain','--bind',str(work),'/work','--ro-bind',str(work/'.git'),'/work/.git','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--dir','/home/reviewer','--chdir','/work','--clearenv','--setenv','HOME','/home/reviewer','--setenv','PATH','/toolchain/bin:/usr/bin:/bin','--setenv','CI','1','--setenv','npm_config_nodedir','/toolchain','--','/bin/sh','-c',c['test_command']]
     before=source_digest(work);p=run(argv,timeout=c['test_timeout'],check=False)
     if source_digest(work)!=before:raise RuntimeError('Dependency setup changed tracked source files')
     (job/'dependencies.log').write_text(p.stdout+p.stderr)
