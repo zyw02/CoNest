@@ -157,8 +157,12 @@ class Operations:
         live=op.current(self.c,s['pr']['number'])
         if live['head']['sha']!=final:
             op.push(self.c,self.work,s['pr'],s['base'])
-        live=op.current(self.c,s['pr']['number'])
-        if live['head']['sha']!=final:raise RuntimeError('Remote head does not match validated commit')
+        for attempt in range(15):
+            live=op.current(self.c,s['pr']['number'])
+            if live['head']['sha']==final:break
+            if live['head']['sha']!=s['head']:raise RuntimeError('Another commit appeared after push')
+            time.sleep(2)
+        else:raise RuntimeError('GitHub has not yet confirmed the pushed revision')
         self.note(s,'waiting for CI',f'Repairs pushed to the original PR: `{final}`. Isolated local checks and source re-review passed.\n\n'+s['review']['summary']+f'\n\nOriginal contribution by @{s["pr"]["user"]["login"]}; co-author credit is retained.')
         return {'final':final,'status':'waiting for CI'}
 
@@ -166,6 +170,15 @@ class Operations:
         if not self.c['publish'] or not self.c['merge']:return {'status':'done'}
         live=self.check(s)
         if live.get('merged'):return {'status':'merged','merge_sha':live['merge_commit_sha']}
+        allowed={'.github/workflows/repository.yml','.github/workflows/review.yml','.github/workflows/contribution.yml'}
+        runs=op.gh(f'repos/{self.c["repo"]}/actions/runs?head_sha={s["final"]}&event=pull_request&per_page=100')['workflow_runs']
+        pending=[run for run in runs if run['head_sha']==s['final'] and run.get('conclusion')=='action_required' and run['path'] in allowed]
+        if pending:
+            files=op.pages(f'repos/{self.c["repo"]}/pulls/{s["pr"]["number"]}/files')
+            if any(f['filename'].startswith('.github/') for f in files):raise RuntimeError('Cannot approve CI for modified workflows automatically')
+            for run in pending:op.gh(f'repos/{self.c["repo"]}/actions/runs/{run["id"]}/approve','POST')
+            interrupt({'status':'CI approved; waiting for checks','head':s['final']})
+            return {'status':'poll CI'}
         refs={s['final'],live.get('merge_commit_sha')};checks=[]
         for ref in refs-{None}:
             checks+=op.gh(f'repos/{self.c["repo"]}/commits/{ref}/check-runs?per_page=100')['check_runs']
@@ -281,6 +294,7 @@ def main():
                 previous.update(status=status,final=final.get('final'),branch=final.get('branch'),error=final.get('error'),updated_at=time.time())
                 if final.get('final'):previous['key']=final['final']+':'+base
                 op.save(path,previous);print(f'PR #{pr["number"]}: {status}',flush=True)
+                if status=='waiting for CI':break
 
 
 if __name__=='__main__':main()

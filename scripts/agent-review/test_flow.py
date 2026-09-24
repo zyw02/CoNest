@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import interrupt, Command
 from flow import build, Operations
@@ -53,6 +54,26 @@ class FlowTests(unittest.TestCase):
         live={'state':'open','draft':False,'head':{'sha':'head'}}
         with patch('runner.current',return_value=live),patch('runner.base_sha',return_value='new-base'):
             with self.assertRaisesRegex(RuntimeError,'stale'):ops.check({'head':'head','base':'old-base','pr':{'number':1}})
+
+    def test_push_waits_for_github_visibility_without_pushing_twice(self):
+        ops=Operations({'workspace':'/unused','publish':True})
+        old={'head':{'sha':'old'}};new={'head':{'sha':'new'}}
+        s={'pr':{'number':1,'head':{'sha':'old'},'user':{'login':'author'}},'head':'old','base':'base','code':'new','review':{'summary':'ok'}}
+        def git(_work,*args,**kwargs):return SimpleNamespace(stdout='new\n' if args[0]=='rev-parse' else '')
+        with patch.object(ops,'check'),patch.object(ops,'update_body'),patch.object(ops,'note'),patch('runner.git',side_effect=git),patch('runner.current',side_effect=[old,old,old,old,new]),patch('runner.push') as push,patch('flow.time.sleep') as sleep:
+            result=ops.publish(s)
+            self.assertEqual(result['final'],'new');self.assertEqual(push.call_count,1);sleep.assert_called_once_with(2)
+
+    def test_approval_is_limited_to_unchanged_known_ci(self):
+        ops=Operations({'workspace':'/unused','repo':'o/r','publish':True,'merge':True})
+        s={'pr':{'number':1},'final':'new'}
+        runs={'workflow_runs':[{'id':10,'head_sha':'new','conclusion':'action_required','path':'.github/workflows/review.yml'},{'id':11,'head_sha':'new','conclusion':'action_required','path':'.github/workflows/untrusted.yml'}]}
+        with patch.object(ops,'check',return_value={}),patch('runner.pages',return_value=[]),patch('runner.gh',side_effect=[runs,None]) as gh,patch('flow.interrupt'):
+            self.assertEqual(ops.ci(s)['status'],'poll CI')
+            self.assertEqual(gh.call_args_list[-1].args,('repos/o/r/actions/runs/10/approve','POST'))
+        with patch.object(ops,'check',return_value={}),patch('runner.pages',return_value=[{'filename':'.github/workflows/review.yml'}]),patch('runner.gh',return_value=runs) as gh:
+            with self.assertRaisesRegex(RuntimeError,'modified workflows'):ops.ci(s)
+            self.assertEqual(gh.call_count,1)
 
     def test_paths_cannot_escape_or_modify_policy(self):
         with tempfile.TemporaryDirectory() as d:
