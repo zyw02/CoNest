@@ -1,0 +1,35 @@
+{
+  "id": "office-context",
+  "version": "1.0.0",
+  "description": "office context",
+  "entry": "component.mjs",
+  "requires": {
+    "office-knowledge": "^1.0.0"
+  },
+  "capabilities": [
+    {
+      "name": "office_context",
+      "description": "Office policy context",
+      "contextProvider": "workspace-v1",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "maxChars": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task",
+          "maxChars"
+        ],
+        "additionalProperties": false
+      },
+      "permissions": [
+        "workspace:read"
+      ]
+    }
+  ]
+}

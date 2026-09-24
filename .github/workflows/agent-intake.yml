@@ -1,0 +1,35 @@
+name: CoNest Agent intake
+on:
+  pull_request_target:
+    branches: [main, develop]
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+concurrency:
+  group: conest-agent-intake-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  queued:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      # Metadata only. Never check out or execute contributor code in this job.
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            if (pr.state !== 'open' || pr.draft || pr.head.sha !== context.payload.pull_request.head.sha) return;
+            const marker = '<!-- conest-agent:queue -->';
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: number });
+            const existing = comments.find(c => ['github-actions[bot]', owner].includes(c.user.login) && c.body.startsWith(marker));
+            const body = `${marker}\n## CoNest Agent: queued\n\nReceived \`${pr.head.sha}\`. Queued for review, repair if needed, validation and merge. Contributor credit will be preserved.\n\nThe local worker processes PRs sequentially in one shared workspace.`;
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+            }

@@ -1,0 +1,120 @@
+{
+  "id": "dsh-bridge",
+  "name": "CoNest Connector for OpenClaw",
+  "description": "Connect OpenClaw to DSH/Cordis components managed by CoNest Runtime.",
+  "activation": {
+    "onStartup": true,
+    "onAgentHarnesses": [
+      "dsh"
+    ]
+  },
+  "commandAliases": [
+    {
+      "name": "conest",
+      "kind": "runtime-slash"
+    },
+    {
+      "name": "bridge",
+      "kind": "runtime-slash"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "contextProvider": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capability",
+          "provider"
+        ],
+        "description": "Explicitly enable one installed workspace-v1 context capability. Shares up to 1000 characters of the current task; never session history.",
+        "properties": {
+          "capability": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          },
+          "provider": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 2000
+          },
+          "maxChars": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 4000
+          }
+        }
+      },
+      "capabilityGuidance": {
+        "type": "boolean",
+        "description": "Append static capability usage guidance when both discovery and invocation tools are authorized. Defaults to false."
+      },
+      "configFile": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Path to the separate CoNest Runtime JSON configuration file."
+      },
+      "workspaceRoot": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Workspace directory available to search components."
+      },
+      "studio": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stateDir"
+        ],
+        "properties": {
+          "stateDir": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dsh": {
+            "type": "boolean",
+            "description": "Enable the optional DSH support pack in CoNest Host. Defaults to true."
+          },
+          "demoMode": {
+            "type": "string",
+            "enum": [
+              "fixture",
+              "live"
+            ],
+            "description": "Optional label for the demo launcher: preset model responses or a live model."
+          }
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "version": "0.6.4",
+  "contracts": {
+    "tools": [
+      "bridge_capabilities",
+      "bridge_invoke",
+      "knowledge_search",
+      "knowledge_verify",
+      "dsh_mcp__reference_memory__create_entities",
+      "dsh_mcp__reference_memory__create_relations",
+      "dsh_mcp__reference_memory__add_observations",
+      "dsh_mcp__reference_memory__delete_entities",
+      "dsh_mcp__reference_memory__delete_observations",
+      "dsh_mcp__reference_memory__delete_relations",
+      "dsh_mcp__reference_memory__read_graph",
+      "dsh_mcp__reference_memory__search_nodes",
+      "dsh_mcp__reference_memory__open_nodes",
+      "dsh_read",
+      "dsh_write",
+      "dsh_edit",
+      "dsh_read_image",
+      "dsh_glob",
+      "dsh_grep",
+      "dsh_bash"
+    ]
+  }
+}

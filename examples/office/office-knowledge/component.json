@@ -1,0 +1,21 @@
+{
+  "id": "office-knowledge",
+  "version": "1.0.0",
+  "description": "office knowledge",
+  "entry": "component.mjs",
+  "requires": {},
+  "capabilities": [
+    {
+      "name": "office_policy",
+      "description": "Read the configured office policy",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "permissions": [
+        "workspace:read"
+      ]
+    }
+  ]
+}

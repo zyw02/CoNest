@@ -1,0 +1,18 @@
+[Unit]
+Description=CoNest LangGraph PR worker
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/var/lib/conest-agent
+Environment=HOME=/root
+Environment=PATH=/var/lib/conest-agent/toolchain/bin:/usr/local/bin:/usr/bin:/bin
+Environment=LANGSMITH_TRACING=false
+ExecStart=/var/lib/conest-agent/venv/bin/python /var/lib/conest-agent/app/flow.py --config /var/lib/conest-agent/config.json
+TimeoutStartSec=3h
+KillMode=control-group
+MemoryHigh=3G
+MemoryMax=4G
+CPUQuota=200%
+TasksMax=512
+UMask=0077

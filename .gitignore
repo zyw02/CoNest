@@ -1,29 +1,22 @@
-# Local dependencies, frozen migration trees, state and backups.
-/source/
-/private/
-/backups/
-/.runtime/
-/.tooling/
-/.platform-testing/
-/dist/
-/SOURCE-INVENTORY.json
-/HANDOFF-README.md
-/HANDOFF-SHA256SUMS
-/SHA256SUMS
-/START-HERE.md
-/VALIDATION.md
+# Local-only work, worktrees and verified dependency downloads.
+/.local/
+/.worktrees/
+/.vendor/
+/.tooling
 node_modules/
-lib/
-dist/
-.bridge/
-.dsh/
+/dist/
+/lib/
 __pycache__/
 *.pyc
 *.log
-*.private.*
+.bridge/
+.dsh/
+
+# Credentials, private state and distributable artifacts.
 .env
 .env.*
 !.env.example
+*.private.*
 *.pem
 *.key
 *.jsonl
@@ -31,10 +24,17 @@ __pycache__/
 *.tar.gz
 *.zip
 *.bundle
-/bridge/releases/
-/bridge/reports/
-/maintenance/local/
 
-# Downloaded and verified development SDK; never commit dependency contents.
-/.vendor/
-apply_fixes.py
+# Legacy/local document names; public additions also pass the repository check.
+/DESIGN*.md
+/CONTROL-DESIGN*.md
+/CONEST-*-SPEC*.md
+/CONTRIBUTING-zh.md
+/docs/archive/
+/docs/research/
+/docs/scripts/
+/docs/*.html
+/docs/*.pdf
+/docs/assets/*architecture*
+/docs/assets/*.prompt.*
+/docs/assets/*.review.*

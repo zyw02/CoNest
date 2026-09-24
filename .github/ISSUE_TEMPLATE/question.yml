@@ -1,0 +1,32 @@
+name: Question
+description: Ask for help running CoNest after following the README.
+title: "[Question]: "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal and point of difficulty
+      description: Which README step or behavior needs clarification?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: CoNest branch/commit, OS/architecture, Node, pnpm and OpenClaw versions.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: Commands, results and what you tried
+      description: Paste relevant redacted text, not a full workspace or customer document. For a security contact request, omit exploit details.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the README and existing issues, and removed credentials and private material.
+          required: true

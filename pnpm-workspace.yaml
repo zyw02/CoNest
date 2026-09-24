@@ -1,0 +1,81 @@
+packages: []
+
+autoInstallPeers: false
+
+overrides:
+  "@deepseek-ai/cordis": "file:.vendor/dsh/vendor/cordis"
+  "@deepseek-ai/cordis-plugin-include": "file:.vendor/dsh/vendor/include"
+  "@deepseek-ai/cordis-plugin-loader": "file:.vendor/dsh/vendor/loader"
+  "@deepseek-ai/cosmokit": "file:.vendor/dsh/vendor/cosmokit"
+  "@deepseek-ai/dsh-agent": "file:.vendor/dsh/packages/core/agent"
+  "@deepseek-ai/dsh-agent-loop": "file:.vendor/dsh/packages/core/agent-loop"
+  "@deepseek-ai/dsh-anonymous-user-id": "file:.vendor/dsh/packages/identity/anonymous-user-id"
+  "@deepseek-ai/dsh-attachment": "file:.vendor/dsh/packages/attachment/attachment"
+  "@deepseek-ai/dsh-attachment-local": "file:.vendor/dsh/packages/attachment/attachment-local"
+  "@deepseek-ai/dsh-bash-local": "file:.vendor/dsh/packages/shell/bash-local"
+  "@deepseek-ai/dsh-bash-sandbox": "file:.vendor/dsh/packages/shell/bash-sandbox"
+  "@deepseek-ai/dsh-brand": "file:.vendor/dsh/packages/util/brand"
+  "@deepseek-ai/dsh-code-runtime": "file:.vendor/dsh/packages/code-runtime/code-runtime"
+  "@deepseek-ai/dsh-commands": "file:.vendor/dsh/packages/interaction/commands"
+  "@deepseek-ai/dsh-credentials": "file:.vendor/dsh/packages/credentials/credentials"
+  "@deepseek-ai/dsh-fs": "file:.vendor/dsh/packages/fs/fs"
+  "@deepseek-ai/dsh-fs-local": "file:.vendor/dsh/packages/fs/fs-local"
+  "@deepseek-ai/dsh-fs-observation-policy": "file:.vendor/dsh/packages/fs/fs-observation-policy"
+  "@deepseek-ai/dsh-fs-sandbox": "file:.vendor/dsh/packages/fs/fs-sandbox"
+  "@deepseek-ai/dsh-home-paths": "file:.vendor/dsh/packages/util/home-paths"
+  "@deepseek-ai/dsh-invariants": "file:.vendor/dsh/packages/runtime-diagnostics/invariants"
+  "@deepseek-ai/dsh-jobs": "file:.vendor/dsh/packages/jobs/jobs"
+  "@deepseek-ai/dsh-launch-environment": "file:.vendor/dsh/packages/util/launch-environment"
+  "@deepseek-ai/dsh-llm": "file:.vendor/dsh/packages/llm/llm"
+  "@deepseek-ai/dsh-llm-deepseek": "file:.vendor/dsh/packages/llm/llm-deepseek"
+  "@deepseek-ai/dsh-llm-pi-ai": "file:.vendor/dsh/packages/llm/llm-pi-ai"
+  "@deepseek-ai/dsh-mcp-client": "file:.vendor/dsh/packages/mcp/mcp-client"
+  "@deepseek-ai/dsh-output-retention": "file:.vendor/dsh/packages/util/output-retention"
+  "@deepseek-ai/dsh-plan-mode": "file:.vendor/dsh/packages/plan/plan-mode"
+  "@deepseek-ai/dsh-sandbox": "file:.vendor/dsh/packages/sandbox/sandbox"
+  "@deepseek-ai/dsh-sandbox-local": "file:.vendor/dsh/packages/sandbox/sandbox-local"
+  "@deepseek-ai/dsh-sandbox-policy": "file:.vendor/dsh/packages/sandbox/sandbox-policy"
+  "@deepseek-ai/dsh-sandbox-windows-acl": "file:.vendor/dsh/packages/sandbox/sandbox-windows-acl"
+  "@deepseek-ai/dsh-scope": "file:.vendor/dsh/packages/core/scope"
+  "@deepseek-ai/dsh-session": "file:.vendor/dsh/packages/core/session"
+  "@deepseek-ai/dsh-session-checkpoint-policy": "file:.vendor/dsh/packages/session/session-checkpoint-policy"
+  "@deepseek-ai/dsh-session-persistence": "file:.vendor/dsh/packages/session/session-persistence"
+  "@deepseek-ai/dsh-session-persistence-jsonl": "file:.vendor/dsh/packages/session/session-persistence-jsonl"
+  "@deepseek-ai/dsh-session-projection": "file:.vendor/dsh/packages/session/session-projection"
+  "@deepseek-ai/dsh-settings": "file:.vendor/dsh/packages/settings/settings"
+  "@deepseek-ai/dsh-shell": "file:.vendor/dsh/packages/shell/shell"
+  "@deepseek-ai/dsh-shell-env": "file:.vendor/dsh/packages/shell/shell-env"
+  "@deepseek-ai/dsh-skill": "file:.vendor/dsh/packages/skill/skill"
+  "@deepseek-ai/dsh-skill-filesystem": "file:.vendor/dsh/packages/skill/skill-filesystem"
+  "@deepseek-ai/dsh-spill": "file:.vendor/dsh/packages/spill/spill"
+  "@deepseek-ai/dsh-subprocess": "file:.vendor/dsh/packages/subprocess/subprocess"
+  "@deepseek-ai/dsh-subprocess-local": "file:.vendor/dsh/packages/subprocess/subprocess-local"
+  "@deepseek-ai/dsh-system-prompt": "file:.vendor/dsh/packages/core/system-prompt"
+  "@deepseek-ai/dsh-timeout": "file:.vendor/dsh/packages/util/timeout"
+  "@deepseek-ai/dsh-tool-bash": "file:.vendor/dsh/packages/shell/tool-bash"
+  "@deepseek-ai/dsh-tool-fs": "file:.vendor/dsh/packages/fs/tool-fs"
+  "@deepseek-ai/dsh-tool-fs-search": "file:.vendor/dsh/packages/fs/tool-fs-search"
+  "@deepseek-ai/dsh-tool-skill": "file:.vendor/dsh/packages/skill/tool-skill"
+  "@deepseek-ai/dsh-tool-todo": "file:.vendor/dsh/packages/todo/tool-todo"
+  "@deepseek-ai/dsh-tool-web": "file:.vendor/dsh/packages/web/tool-web"
+  "@deepseek-ai/dsh-tools": "file:.vendor/dsh/packages/core/tools"
+  "@deepseek-ai/dsh-typert-protocol": "file:.vendor/dsh/packages/typert/protocol"
+  "@deepseek-ai/dsh-user-approval": "file:.vendor/dsh/packages/interaction/user-approval"
+  "@deepseek-ai/dsh-user-questions": "file:.vendor/dsh/packages/interaction/user-questions"
+  "@deepseek-ai/dsh-web": "file:.vendor/dsh/packages/web/web"
+  "@deepseek-ai/dsh-web-fetch-http": "file:.vendor/dsh/packages/web/web-fetch-http"
+  "@deepseek-ai/schemastery": "file:.vendor/dsh/vendor/schemastery"
+
+patchedDependencies:
+  "node-pty@1.1.0": patches/node-pty@1.1.0.patch
+
+allowBuilds:
+  esbuild: true
+  node-pty: true
+  "@vscode/ripgrep": true
+  koffi: true
+  "@deepseek-ai/dsh-subprocess-local@file:.vendor/dsh/packages/subprocess/subprocess-local": true
+  "@google/genai": false
+  openclaw: true
+  protobufjs: true
+  tree-sitter-bash: true

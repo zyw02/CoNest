@@ -17,16 +17,18 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 24.15.0
+          node-version-file: .node-version
       - name: Install pinned pnpm
         run: npm install --global pnpm@11.7.0
       - name: Check repository contents
-        run: python3 maintenance/check-repository.py
+        run: python3 scripts/maintenance/check-repository.py
+      - name: Check contribution automation
+        run: python3 scripts/maintenance/test-contribution.py
       - name: Download and verify the frozen SDK
-        run: node maintenance/bootstrap.mjs
+        run: node scripts/maintenance/bootstrap.mjs
       - name: Install locked dependencies
-        run: pnpm --dir bridge install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Build
-        run: pnpm --dir bridge run build
+        run: pnpm run build
       - name: Test
-        run: pnpm --dir bridge exec tsx --test 'test/*.test.ts'
+        run: pnpm exec tsx --test 'test/*.test.ts'

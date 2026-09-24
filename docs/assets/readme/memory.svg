@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+<!-- Icon: Lucide database; 951813ce76a859d4d8b145366972cbb237147a4e; see LICENSE-lucide. -->
+<rect x="1" y="1" width="46" height="46" rx="13" fill="#EAF0F8"/>
+<g transform="translate(12 12)" fill="none" stroke="#466B99" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+<ellipse cx="12" cy="5" rx="9" ry="3" />
+  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+  <path d="M3 12A9 3 0 0 0 21 12" />
+</g>
+</svg>

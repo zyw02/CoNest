@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Start CoNest
+    url: https://github.com/zyw02/CoNest#quick-start
+    about: The canonical startup guide, also available in Chinese.
+  - name: Contribution and security reporting rules
+    url: https://github.com/zyw02/CoNest/blob/main/CONTRIBUTING.md
+    about: Read before submitting a substantial change or sharing security details.

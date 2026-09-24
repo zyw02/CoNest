@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+<!-- Icon: Lucide code-xml; 951813ce76a859d4d8b145366972cbb237147a4e; see LICENSE-lucide. -->
+<rect x="1" y="1" width="46" height="46" rx="13" fill="#F8E8DF"/>
+<g transform="translate(12 12)" fill="none" stroke="#A9563E" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+<path d="m18 16 4-4-4-4" />
+  <path d="m6 8-4 4 4 4" />
+  <path d="m14.5 4-5 16" />
+</g>
+</svg>
