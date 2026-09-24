@@ -5,7 +5,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import interrupt, Command
-from flow import build, Operations
+from flow import build, Operations, confirmed_publish
 from workspace import Workspace
 import runner
 
@@ -74,6 +74,14 @@ class FlowTests(unittest.TestCase):
         with patch.object(ops,'check',return_value={}),patch('runner.pages',return_value=[{'filename':'.github/workflows/review.yml'}]),patch('runner.gh',return_value=runs) as gh:
             with self.assertRaisesRegex(RuntimeError,'modified workflows'):ops.ci(s)
             self.assertEqual(gh.call_count,1)
+
+    def test_recovered_push_requires_the_successfully_validated_commit(self):
+        state={'code':'validated','test_ok':True,'review':{'coverage_complete':True,'findings':[]}}
+        pr={'head':{'sha':'validated'}}
+        self.assertTrue(confirmed_publish(state,pr))
+        self.assertFalse(confirmed_publish({**state,'test_ok':False},pr))
+        self.assertFalse(confirmed_publish(state,{'head':{'sha':'someone-elses-commit'}}))
+        self.assertFalse(confirmed_publish({**state,'review':{'coverage_complete':True,'findings':['defect']}},pr))
 
     def test_paths_cannot_escape_or_modify_policy(self):
         with tempfile.TemporaryDirectory() as d:

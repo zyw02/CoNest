@@ -121,10 +121,12 @@ def prepare(c,pr,job):
     if git(work,'rev-parse','FETCH_HEAD').stdout.strip()!=pr['head']['sha']:raise RuntimeError('PR changed while fetching')
     base=base_sha(c,pr);git(work,'fetch','origin',pr['base']['ref'])
     if git(work,'rev-parse','FETCH_HEAD').stdout.strip()!=base:raise RuntimeError('Base changed while fetching')
+    start=c.get('start_commit') or pr['head']['sha']
+    if git(work,'merge-base','--is-ancestor',pr['head']['sha'],start,check=False).returncode:raise RuntimeError('Saved attempt does not contain the current PR head')
     branch=f'agent/pr-{pr["number"]}-'+job.name.rsplit('-',1)[-1]
     if git(work,'show-ref','--verify','--quiet','refs/heads/'+branch,check=False).returncode==0:
         git(work,'checkout',branch)
-    else:git(work,'checkout','-b',branch,pr['head']['sha'])
+    else:git(work,'checkout','-b',branch,start)
     return work,base
 
 

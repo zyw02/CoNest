@@ -32,6 +32,12 @@ class State(TypedDict, total=False):
     status: str
     error: str
     merge_sha: str
+    seed: str
+
+
+def confirmed_publish(s,pr):
+    review=s.get('review',{})
+    return s.get('test_ok') is True and review.get('coverage_complete') is True and review.get('findings')==[] and s.get('code')==pr['head']['sha']
 
 
 def route_review(s):
@@ -72,9 +78,9 @@ class Operations:
     def prepare(self,s):
         job=Path(s['job']);receipt=job/'checkout.json'
         if receipt.exists():return json.loads(receipt.read_text())
-        work,base=op.prepare(self.c,s['pr'],job)
+        work,base=op.prepare({**self.c,'start_commit':s.get('seed')},s['pr'],job)
         trailers=op.credit(s['pr'],op.pages(f'repos/{self.c["repo"]}/pulls/{s["pr"]["number"]}/commits'))
-        out={'base':base,'branch':op.git(work,'branch','--show-current').stdout.strip(),'trailers':trailers,'code':s['head'],'cycle':0,'status':'reconciling'}
+        out={'base':base,'branch':op.git(work,'branch','--show-current').stdout.strip(),'trailers':trailers,'code':op.git(work,'rev-parse','HEAD').stdout.strip(),'cycle':0,'status':'reconciling'}
         op.save(receipt,out)
         self.note(s,'reviewing',f'Reviewing `{s["head"]}` against `{base}` in the shared automation workspace.')
         return out
@@ -268,7 +274,11 @@ def main():
                 base=op.base_sha(c,pr)
                 snapshot_code=None
                 if previous.get('thread'):
-                    snapshot_code=graph.get_state({'configurable':{'thread_id':previous['thread']}}).values.get('code')
+                    prior_config={'configurable':{'thread_id':previous['thread']}}
+                    prior=graph.get_state(prior_config).values;snapshot_code=prior.get('code')
+                    if previous.get('status')=='blocked' and previous.get('error') in ('Remote head does not match validated commit','GitHub has not yet confirmed the pushed revision') and confirmed_publish(prior,pr):
+                        graph.update_state(prior_config,{'final':snapshot_code,'status':'waiting for CI','error':''},as_node='publish')
+                        previous.update(final=snapshot_code,status='waiting for CI',error=None,key=snapshot_code+':'+previous['base']);op.save(path,previous)
                 resumable=previous.get('status') in ('running','waiting for CI') and pr['head']['sha'] in (previous.get('head'),previous.get('final'),snapshot_code) and base==previous.get('base')
                 key=pr['head']['sha']+':'+base
                 if not a.retry and previous.get('key')==key and previous.get('status') in ('blocked','done','local complete','merged'):continue
@@ -285,7 +295,15 @@ def main():
                         print('Workspace contains unfinished changes; waiting for recovery',flush=True);break
                     thread=f'pr-{pr["number"]}-{time.time_ns()}';job=state/'jobs'/thread;job.mkdir(parents=True)
                     cfg={'configurable':{'thread_id':thread},'recursion_limit':80}
+                    seed=None
+                    branch=previous.get('branch','')
+                    if branch.startswith(f'agent/pr-{pr["number"]}-') and pr['head']['sha'] in (previous.get('head'),previous.get('final')):
+                        ref=op.git(c['workspace'],'rev-parse','--verify','refs/heads/'+branch,check=False)
+                        if not ref.returncode:
+                            candidate=ref.stdout.strip()
+                            if not op.git(c['workspace'],'merge-base','--is-ancestor',pr['head']['sha'],candidate,check=False).returncode:seed=candidate
                     initial={'pr':pr,'head':pr['head']['sha'],'base':base,'job':str(job),'status':'running','cycle':0}
+                    if seed:initial['seed']=seed
                     previous={'key':key,'head':pr['head']['sha'],'base':base,'thread':thread,'job':str(job),'status':'running'};op.save(path,previous)
                 result=graph.invoke(initial,cfg,durability='sync')
                 final=graph.get_state(cfg).values
