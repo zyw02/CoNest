@@ -136,8 +136,11 @@ test('stdin EOF shuts down the worker and oversized partial frames cannot accumu
 
 test('the worker reports a dropped response when its stdout is already destroyed', async context => {
   const { workspace } = await fixture(context);
-  const script = `process.argv = [process.execPath, ${JSON.stringify(workerFile)}, 'serve', '--workspace', ${JSON.stringify(workspace)}];
+  const script = `const { PassThrough } = await import('node:stream');
+    process.argv = [process.execPath, ${JSON.stringify(workerFile)}, 'serve', '--workspace', ${JSON.stringify(workspace)}];
+    Object.defineProperty(process, 'stdout', { configurable: true, value: new PassThrough() });
     process.stdout.destroy();
+    if (!process.stdout.destroyed) throw new Error('The stdout fixture did not enter its destroyed state');
     await import(${JSON.stringify(pathToFileURL(workerFile).href)});`;
   const child = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['pipe', 'pipe', 'pipe'] });
   let errors = '';
