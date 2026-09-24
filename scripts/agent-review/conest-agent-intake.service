@@ -1,0 +1,12 @@
+[Unit]
+Description=CoNest PR receipt fallback
+After=network-online.target
+[Service]
+Type=oneshot
+Environment=HOME=/root
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=LANGSMITH_TRACING=false
+ExecStart=/var/lib/conest-agent/venv/bin/python /var/lib/conest-agent/app/flow.py --config /var/lib/conest-agent/config.json --intake
+TimeoutStartSec=60s
+MemoryMax=256M
+UMask=0077
