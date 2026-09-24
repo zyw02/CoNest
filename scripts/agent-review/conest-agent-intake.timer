@@ -1,8 +1,0 @@
-[Unit]
-Description=Acknowledge new CoNest PR revisions
-[Timer]
-OnBootSec=15s
-OnUnitInactiveSec=30s
-AccuracySec=1s
-[Install]
-WantedBy=timers.target
