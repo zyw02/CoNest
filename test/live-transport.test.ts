@@ -56,3 +56,14 @@ test('live transport requires private credentials and rejects truncated model re
   await assert.rejects(transport.complete(input), /output token ceiling/);
   await assert.rejects(transport.complete(input), /request budget/);
 });
+
+test('live transport does not replay an HTTP failure with an unknown charge outcome', async t => {
+  let requests = 0;
+  const transport = await createLiveDeepSeek(await credential(t), async () => {
+    requests++;
+    return new Response('upstream unavailable', { status: 503 });
+  });
+  await assert.rejects(transport.complete(input), /HTTP 503/);
+  await assert.rejects(transport.complete(input), /request budget/);
+  assert.equal(requests, 1);
+});
