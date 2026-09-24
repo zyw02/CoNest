@@ -76,6 +76,8 @@ class Operations:
 
     def model(self,s,label,prompt,edit=False):
         c={**self.c,'review_head':s['head']}
+        diagnostic=self.c.get('diagnostics',{}).get(str(s['pr']['number']),'')
+        if diagnostic:prompt+='\nMaintainer diagnostic evidence (validate against current source):\n'+diagnostic[:6000]
         return op.codex(c,self.work,s['base'],op.POLICY+'\n'+prompt,Path(s['job'])/label,edit)
 
     def prepare(self,s):
@@ -153,7 +155,7 @@ class Operations:
             if not related and live['title'].startswith('feat'):raise RuntimeError('Feature PR needs a related issue or PR before automated merge')
             if not related:related='None — standalone corrective change described in the original contribution.'
             quoted='\n'.join('> '+line for line in original.splitlines()) or '> No original description was supplied.'
-            body='## Problem\n\nOriginal contributor description:\n\n'+quoted+'\n\n## Changes\n\n'+s['review']['summary']+'\n\n## Validation\n\n'+evidence+'\n\n## Compatibility and risks\n\nThe contribution has been reconciled with the current target branch. Source review covered the affected contracts and callers. Remaining review limits: '+('; '.join(s['review']['limitations']) or 'No additional source-review coverage gaps reported.')+'\n\n## Related issues\n\n'+related+'\n\n## Checklist\n\n- [x] The integrated diff was reviewed.\n- [x] Configured local validation passed on the stated revision.\n- [x] Original contributor attribution is retained.\n- [x] Actual validation and remaining limits are stated.\n'
+            body='## Problem\n\nOriginal contributor description:\n\n'+quoted+'\n\n## Changes\n\n'+s['review'].get('change_summary',s['review']['summary'])+'\n\n## Validation\n\n'+evidence+'\n\n## Compatibility and risks\n\nThe contribution has been reconciled with the current target branch. Source review covered the affected contracts and callers. Remaining review limits: '+('; '.join(s['review']['limitations']) or 'No additional source-review coverage gaps reported.')+'\n\n## Related issues\n\n'+related+'\n\n## Checklist\n\n- [x] The integrated diff was reviewed.\n- [x] Configured local validation passed on the stated revision.\n- [x] Original contributor attribution is retained.\n- [x] Actual validation and remaining limits are stated.\n'
         op.gh(f'repos/{self.c["repo"]}/pulls/{live["number"]}','PATCH',{'body':body})
 
     def publish(self,s):
