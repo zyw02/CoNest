@@ -69,7 +69,10 @@ class Operations:
         op.comment(self.c,s['pr']['number'],status,body)
 
     def checkpoint_source(self,s,label):
-        return op.commit_changes(self.c,self.work,s['pr'],s['trailers'],f'fix: {label} for PR #{s["pr"]["number"]}')
+        code=op.commit_changes(self.c,self.work,s['pr'],s['trailers'],f'fix: {label} for PR #{s["pr"]["number"]}')
+        protected=op.git(self.work,'diff','--name-only',s['base'],'HEAD','--','.github','AGENTS.md','SECURITY.md','scripts/agent-review','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','.npmrc','.pnpmfile.cjs','scripts/maintenance/bootstrap.mjs','scripts/maintenance/sdk.lock.json').stdout.strip()
+        if protected:raise RuntimeError('Automation policy changes require maintainer review: '+protected)
+        return code
 
     def model(self,s,label,prompt,edit=False):
         c={**self.c,'review_head':s['head']}
@@ -269,6 +272,18 @@ def main():
         except BlockingIOError:return
         with SqliteSaver.from_conn_string(str(state/'checkpoints.sqlite')) as saver:
             graph=build(Operations(c),saver)
+            if op.git(c['workspace'],'status','--porcelain').stdout.strip():
+                active=op.git(c['workspace'],'branch','--show-current').stdout.strip();owner=None
+                for candidate in prs:
+                    record=state/f'pr-{candidate["number"]}.json'
+                    if not record.exists():continue
+                    entry=json.loads(record.read_text())
+                    if not entry.get('thread'):continue
+                    snapshot=graph.get_state({'configurable':{'thread_id':entry['thread']}}).values
+                    if snapshot.get('branch')==active and entry.get('status')=='running':owner=candidate['number'];break
+                if owner is None:
+                    print('Unfinished workspace changes have no active queue owner; waiting for recovery',flush=True);return
+                prs.sort(key=lambda p:(p['number']!=owner,p['number']))
             for pr in prs:
                 path=state/f'pr-{pr["number"]}.json';previous=json.loads(path.read_text()) if path.exists() else {}
                 base=op.base_sha(c,pr)

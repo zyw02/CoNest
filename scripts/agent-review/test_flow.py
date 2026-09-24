@@ -1,4 +1,6 @@
 import tempfile
+import os
+import shlex
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -82,6 +84,18 @@ class FlowTests(unittest.TestCase):
         self.assertFalse(confirmed_publish({**state,'test_ok':False},pr))
         self.assertFalse(confirmed_publish(state,{'head':{'sha':'someone-elses-commit'}}))
         self.assertFalse(confirmed_publish({**state,'review':{'coverage_complete':True,'findings':['defect']}},pr))
+
+    def test_focused_tests_reject_other_paths_and_quote_test_names(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'test').mkdir();name='test/a; touch injected.test.ts';(root/name).write_text('// fixture')
+            env={'SOURCE_TOOLCHAIN':'/toolchain','SOURCE_TEST_TIMEOUT':'10','SOURCE_TEST_LOG':str(root/'logs')}
+            with patch.dict(os.environ,env),patch('runner.tests',return_value=(True,'passed')) as tests:
+                result=Workspace(root,True).call('run_test',{'path':name})
+                self.assertTrue(result['passed']);command=tests.call_args.args[0]['test_command']
+                self.assertEqual(shlex.split(command)[-1],name)
+                with self.assertRaises(ValueError):Workspace(root).call('run_test',{'path':name})
+                with self.assertRaises(ValueError):Workspace(root,True).call('run_test',{'path':'scripts/build.mjs'})
+                self.assertEqual(tests.call_count,1)
 
     def test_paths_cannot_escape_or_modify_policy(self):
         with tempfile.TemporaryDirectory() as d:
