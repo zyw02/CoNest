@@ -1,0 +1,90 @@
+{
+  "id": "web-fetch",
+  "version": "1.0.0",
+  "description": "Fetch readable text from exact network origins approved in operator configuration.",
+  "entry": "./component.mjs",
+  "requires": {},
+  "capabilities": [
+    {
+      "name": "fetch_url",
+      "description": "Fetch a page from an operator-approved origin and extract text and metadata. Redirects must also use an approved origin.",
+      "permissions": [
+        "workspace:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "pattern": "^https?://"
+          },
+          "maxChars": {
+            "type": "integer",
+            "minimum": 500,
+            "maximum": 50000
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "statusCode": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "textLength": {
+            "type": "integer"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "statusCode",
+          "title",
+          "text",
+          "textLength"
+        ]
+      }
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "allowedOrigins": {
+        "type": "array",
+        "maxItems": 32,
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "description": "Exact trusted HTTP or HTTPS origins. Empty by default; every initial and redirect destination must match."
+      }
+    }
+  }
+}

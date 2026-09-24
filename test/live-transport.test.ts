@@ -29,22 +29,24 @@ test('live transport keeps real decisions unchanged and enforces finite request 
     assert.deepEqual(body.messages, input.messages);
     return Response.json(real);
   });
-  for (let i = 0; i < 12; i++) assert.deepEqual(await transport.complete(input), real);
+  for (let i = 0; i < 100; i++) assert.deepEqual(await transport.complete(input), real);
   await assert.rejects(transport.complete(input), /request budget/);
-  assert.equal(requests, 12);
-  assert.equal(transport.report().calls.length, 12);
+  assert.equal(requests, 100);
+  assert.equal(transport.report().calls.length, 100);
   assert.ok(!JSON.stringify(transport.report()).includes(testKey));
 });
 
-test('live transport blocks oversized inputs and stops after an uncertain upstream failure', async t => {
+test('live transport blocks oversized inputs and does not replay uncertain upstream failures', async t => {
   const file = await credential(t);
   let requests = 0;
   const transport = await createLiveDeepSeek(file, async () => { requests++; throw new Error(`Unavailable ${testKey}`); });
   await assert.rejects(transport.complete(input), /Unavailable \[REDACTED\]/);
   await assert.rejects(transport.complete(input), /request budget/);
   assert.equal(requests, 1);
+  assert.equal(transport.report().calls.length, 1);
+  assert.equal(transport.report().calls[0].error, 'Unavailable [REDACTED]');
   const large = await createLiveDeepSeek(file, async () => { throw new Error('Must not call upstream'); });
-  await assert.rejects(large.complete({ messages: [{ role: 'user', content: 'x'.repeat(400_001) }], tools: [] }), /byte budget/);
+  await assert.rejects(large.complete({ messages: [{ role: 'user', content: 'x'.repeat(10_000_001) }], tools: [] }), /byte budget/);
 });
 
 test('live transport requires private credentials and rejects truncated model responses', async t => {

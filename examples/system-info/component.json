@@ -1,0 +1,78 @@
+{
+  "id": "system-info",
+  "version": "1.0.0",
+  "description": "System resource monitoring: CPU, memory, disk, and process info for the host running the bridge.",
+  "entry": "./component.mjs",
+  "requires": {},
+  "capabilities": [
+    {
+      "name": "system_metrics",
+      "description": "Get current system resource usage: CPU, memory, disk, load average, uptime.",
+      "permissions": ["workspace:read"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cpuModel": { "type": "string" },
+          "cpuCores": { "type": "integer" },
+          "cpuUsagePercent": { "type": "number" },
+          "memoryTotalMB": { "type": "number" },
+          "memoryUsedMB": { "type": "number" },
+          "memoryPercent": { "type": "number" },
+          "diskTotalGB": { "type": "number" },
+          "diskUsedGB": { "type": "number" },
+          "diskPercent": { "type": "number" },
+          "loadAverage": {
+            "type": "object",
+            "properties": {
+              "1min": { "type": "number" },
+              "5min": { "type": "number" },
+              "15min": { "type": "number" }
+            }
+          },
+          "uptimeSeconds": { "type": "number" },
+          "hostname": { "type": "string" }
+        },
+        "required": ["cpuCores", "cpuUsagePercent", "memoryTotalMB", "memoryUsedMB", "memoryPercent", "diskTotalGB", "diskUsedGB", "diskPercent", "uptimeSeconds"]
+      }
+    },
+    {
+      "name": "top_processes",
+      "description": "List top CPU and memory consuming processes.",
+      "permissions": ["workspace:read"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "count": { "type": "integer", "minimum": 1, "maximum": 20 }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "processes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pid": { "type": "integer" },
+                "name": { "type": "string" },
+                "cpuPercent": { "type": "number" },
+                "memPercent": { "type": "number" },
+                "rssMB": { "type": "number" }
+              },
+              "required": ["pid", "name", "cpuPercent", "memPercent"]
+            }
+          }
+        },
+        "required": ["processes"]
+      }
+    }
+  ]
+}

@@ -30,7 +30,14 @@ export async function serve(options: ServerOptions): Promise<void> {
   const send = (message: WireResponse | WireEvent | HostCallback): void => {
     const frame = `${JSON.stringify(message)}\n`;
     if (Buffer.byteLength(frame) > 2_000_000) throw new BridgeError('RESULT_TOO_LARGE', 'The component result exceeds the 2 MiB response limit');
-    if (!process.stdout.destroyed) process.stdout.write(frame);
+    if (process.stdout.destroyed) {
+      const droppedId = 'id' in message ? message.id
+        : 'data' in message && 'id' in message.data ? message.data.id
+        : 'event';
+      process.stderr.write(`CoNest Runtime send: stdout already destroyed; dropped ${droppedId}\n`);
+      return;
+    }
+    process.stdout.write(frame);
   };
   const extensions = new ExtensionHost(options.config, send);
   const manage = async (method: 'status' | 'reload' | 'manage', params: unknown): Promise<RuntimeStatus> => {

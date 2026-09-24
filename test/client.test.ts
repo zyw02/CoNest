@@ -44,3 +44,44 @@ test('the supervised worker serves a real DSH search and exits cleanly', async (
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test('cancellation after authorization releases the task before a caller can retry it', async () => {
+  const client = new BridgeClient({ workerFile: 'unused', startupTimeoutMs: 1_000, shutdownTimeoutMs: 1_000 });
+  const abort = new AbortController();
+  const releaseStarted = Promise.withResolvers<void>();
+  const finishRelease = Promise.withResolvers<void>();
+  let leased = false;
+  let first = true;
+  Reflect.set(client, 'state', 'ready');
+  Reflect.set(client, 'child', {});
+  Reflect.set(client, 'request', async (method: string) => {
+    if (method === 'authorize') {
+      if (leased) throw new Error('DUPLICATE_TASK');
+      leased = true;
+      if (first) { first = false; abort.abort(new Error('caller cancelled')); }
+      return { token: 'grant', expiresAt: Date.now() + 5_000, generation: 'revision' };
+    }
+    if (method === 'release') {
+      releaseStarted.resolve();
+      await finishRelease.promise;
+      leased = false;
+      return { released: true };
+    }
+    if (method === 'invoke') return { value: 'completed', generation: 'revision' };
+    throw new Error('Unexpected method ' + method);
+  });
+  const input = {
+    capability: 'knowledge_search', args: { query: 'marker' }, taskId: 'same-task', callId: 'first-call',
+    subject: 'test', principal: { kind: 'agent' as const, agentId: 'main' },
+    workspaceRoot: '/unused', permissions: ['workspace:read' as const],
+  };
+  const interrupted = client.invoke({ ...input, signal: abort.signal });
+  await releaseStarted.promise;
+  let finished = false;
+  void interrupted.catch(() => { finished = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(finished, false, 'the cancellation must wait for grant release');
+  finishRelease.resolve();
+  await assert.rejects(interrupted, /caller cancelled/);
+  assert.equal((await client.invoke({ ...input, callId: 'retry-call' })).value, 'completed');
+});

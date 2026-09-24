@@ -25,6 +25,9 @@ __pycache__/
 *.zip
 *.bundle
 
+# Local repair helper; downloaded SDK content is covered by /.vendor/ above.
+/apply_fixes.py
+
 # Legacy/local document names; public additions also pass the repository check.
 /DESIGN*.md
 /CONTROL-DESIGN*.md

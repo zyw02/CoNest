@@ -8,9 +8,9 @@ export async function createLiveDeepSeek(credentialFile, fetchResponse = fetch) 
   await assertPrivateFile(credentialFile);
   const key = parseEnv(await readFile(credentialFile, 'utf8')).DEEPSEEK_API_KEY?.trim();
   assert.ok(key && key !== 'YOUR_API_KEY_HERE', 'DEEPSEEK_API_KEY is missing or a placeholder');
-  const maxRequests = 12;
+  const maxRequests = 100;
   const maxOutputTokens = 2048;
-  const maxInputBytes = 400_000;
+  const maxInputBytes = 10_000_000;
   const calls = [];
   let inputBytes = 0;
   let stopped = false;
@@ -19,9 +19,10 @@ export async function createLiveDeepSeek(credentialFile, fetchResponse = fetch) 
     assert.ok(!stopped && calls.length < maxRequests, 'The live model request budget is exhausted');
     const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: input.messages, tools: input.tools,
       stream: false, thinking: { type: 'disabled' }, max_tokens: maxOutputTokens });
-    inputBytes += Buffer.byteLength(body);
-    assert.ok(inputBytes <= maxInputBytes, 'The live model input byte budget is exhausted');
-    const call = { request: calls.length + 1, inputBytes: Buffer.byteLength(body), startedAt: new Date().toISOString() };
+    const requestBytes = Buffer.byteLength(body);
+    assert.ok(inputBytes + requestBytes <= maxInputBytes, 'The live model input byte budget is exhausted');
+    inputBytes += requestBytes;
+    const call = { request: calls.length + 1, inputBytes: requestBytes, startedAt: new Date().toISOString() };
     calls.push(call);
     const started = performance.now();
     try {
@@ -39,8 +40,11 @@ export async function createLiveDeepSeek(credentialFile, fetchResponse = fetch) 
       call.elapsedMs = Math.round(performance.now() - started);
       return result;
     } catch (error) {
-      // Do not automatically replay chargeable requests after an uncertain failure.
+      // A request may have reached the provider before a timeout or parse failure.
+      // Never automatically replay an uncertain chargeable request.
       stopped = true;
+      call.status = call.status ?? 0;
+      call.error = redact(error.message);
       throw new Error(redact(error.message));
     }
   };

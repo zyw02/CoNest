@@ -11,6 +11,7 @@ export interface LiveCall {
   model?: string;
   usage?: Record<string, unknown>;
   elapsedMs?: number;
+  error?: string;
 }
 
 export interface LiveTransport {
