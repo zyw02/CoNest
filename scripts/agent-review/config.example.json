@@ -7,13 +7,20 @@
   "toolchain": "/var/lib/conest-agent/toolchain",
   "codex": "/usr/local/bin/codex",
   "model": "gpt-6-sol",
-  "branches": ["main", "develop"],
+  "branches": [
+    "main",
+    "develop"
+  ],
   "publish": false,
   "merge": false,
   "max_fix_rounds": 2,
   "daily_model_calls": 30,
   "model_timeout": 1200,
   "test_timeout": 1200,
-  "required_checks": ["linux", "review", "pr-description"],
+  "required_checks": [
+    "linux",
+    "review",
+    "pr-description"
+  ],
   "test_command": "pnpm check && pnpm test && pnpm run test:runtime"
 }
