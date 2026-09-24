@@ -31,7 +31,7 @@ export async function serve(options: ServerOptions): Promise<void> {
     const frame = `${JSON.stringify(message)}\n`;
     if (Buffer.byteLength(frame) > 2_000_000) throw new BridgeError('RESULT_TOO_LARGE', 'The component result exceeds the 2 MiB response limit');
     if (process.stdout.destroyed) {
-      process.stderr.write(`CoNest Runtime send: stdout already destroyed; dropped ${message.id ?? 'event'}\n`);
+      process.stderr.write(`CoNest Runtime send: stdout already destroyed; dropped ${'id' in message ? message.id : message.event}\n`);
       return;
     }
     process.stdout.write(frame);

@@ -3,7 +3,7 @@ import { execFile, spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { BridgeClient } from '../src/client.js';
 import { BridgeHost } from '../src/host.js';
@@ -131,6 +131,33 @@ test('stdin EOF shuts down the worker and oversized partial frames cannot accumu
       const deadline = setTimeout(() => child.kill('SIGKILL'), 3_000);
       try { assert.equal(await exited, 0); } finally { clearTimeout(deadline); }
     } finally { if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await exited; } }
+  }
+});
+
+test('the worker reports a dropped response when its stdout is already destroyed', async context => {
+  const { workspace } = await fixture(context);
+  const script = `process.argv = [process.execPath, ${JSON.stringify(workerFile)}, 'serve', '--workspace', ${JSON.stringify(workspace)}];
+    process.stdout.destroy();
+    await import(${JSON.stringify(pathToFileURL(workerFile).href)});`;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let errors = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', chunk => { errors += chunk; });
+  const exited = new Promise<number | null>((resolve, reject) => {
+    child.once('exit', resolve);
+    child.once('error', reject);
+  });
+  try {
+    await eventually(() => errors.includes('CoNest Host startup: ready'), 5_000);
+    child.stdin.write(`${JSON.stringify({ id: 'probe', method: 'status' })}\n`);
+    await eventually(() => errors.includes('CoNest Runtime send: stdout already destroyed; dropped probe'), 3_000);
+    child.stdin.end();
+    assert.equal(await exited, 0);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGKILL');
+      await exited;
+    }
   }
 });
 
