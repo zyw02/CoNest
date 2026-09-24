@@ -14,6 +14,6 @@
   "daily_model_calls": 30,
   "model_timeout": 1200,
   "test_timeout": 1200,
-  "required_checks": ["linux", "review"],
+  "required_checks": ["linux", "review", "pr-description"],
   "test_command": "pnpm check && pnpm test && pnpm run test:runtime"
 }

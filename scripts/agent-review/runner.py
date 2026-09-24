@@ -92,6 +92,9 @@ def codex(c,work,base,prompt,logdir,edit=False):
     for feature in ['shell_tool','apps','plugins','hooks','multi_agent','browser_use','computer_use','image_generation','view_image','workspace_dependencies']:
         args+=['-c',f'features.{feature}=false']
     args+=['-c','features.skip_host_skill_discovery=true','-c','mcp_servers.source.command='+json.dumps(sys.executable),'-c','mcp_servers.source.args='+json.dumps([str(HERE/'workspace.py'),str(work),'edit' if edit else 'read']),'-c','mcp_servers.source.env.REVIEW_BASE_SHA='+json.dumps(base),'-c','mcp_servers.source.env.REVIEW_HEAD_SHA='+json.dumps(c.get('review_head',git(work,'rev-parse','HEAD').stdout.strip())),'-c','mcp_servers.source.required=true','--output-schema',str(schema),'--output-last-message',str(output),'--json','-']
+    if edit:
+        for tool in ('edit_file','create_file','delete_file','restore_base'):
+            args+=['-c',f'mcp_servers.source.tools.{tool}.approval_mode="approve"']
     # Codex authenticates through the user's existing login. GitHub credentials and
     # inherited orchestration variables are not passed into the worker.
     env={k:v for k,v in os.environ.items() if k in ('HOME','PATH','LANG','LC_ALL','SSL_CERT_FILE','SSL_CERT_DIR','HTTPS_PROXY','HTTP_PROXY','ALL_PROXY','NO_PROXY')}

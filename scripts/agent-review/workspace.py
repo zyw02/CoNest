@@ -64,6 +64,16 @@ class Workspace:
             if len(ref)!=40 or any(c not in '0123456789abcdef' for c in ref):raise ValueError('Invalid revision')
             lines=self.git('show',ref+':'+a['path']).splitlines(); start=max(1,a.get('start',1)); count=min(400,a.get('count',200))
             return {'total_lines':len(lines),'content':'\n'.join(f'{i+1}: {l}' for i,l in enumerate(lines) if start-1<=i<start-1+count)}
+        if name == 'restore_base':
+            p=self.path(a['path'],write=True);ref=os.environ['REVIEW_BASE_SHA']
+            if len(ref)!=40 or any(c not in '0123456789abcdef' for c in ref):raise ValueError('Invalid revision')
+            exists=subprocess.run(['git','cat-file','-e',ref+':'+a['path']],cwd=self.root,capture_output=True).returncode==0
+            if exists:
+                content=self.git('show',ref+':'+a['path'])
+                if len(content)>1_000_000:raise ValueError('File too large')
+                p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)
+            elif p.is_file():p.unlink()
+            return 'restored base version' if exists else 'removed path absent from base'
         if name == 'delete_file':
             p=self.path(a['path'],write=True)
             if not p.is_file():raise ValueError('Expected source file')
@@ -88,8 +98,8 @@ def tools(editable):
            ('changes','List changed files and diff sizes',{},[]),
            ('read_revision','Read original PR or base source before conflict resolution',{'path':{'type':'string'},'revision':{'type':'string','enum':['base','pr']},'start':{'type':'integer'},'count':{'type':'integer'}},['path','revision'])]
     if editable:specs += [('edit_file','Replace one exact source fragment',{'path':{'type':'string'},'old':{'type':'string'},'new':{'type':'string'}},['path','old','new']),('create_file','Create a new source or regression test file',{'path':{'type':'string'},'content':{'type':'string'}},['path','content'])]
-    if editable:specs += [('delete_file','Delete an obsolete source file',{'path':{'type':'string'}},['path'])]
-    return [{'name':n,'description':d,'inputSchema':{'type':'object','properties':p,'required':r,'additionalProperties':False},'annotations':{'readOnlyHint':n not in ('edit_file','create_file','delete_file'),'openWorldHint':False}} for n,d,p,r in specs]
+    if editable:specs += [('restore_base','Restore one path from the pinned base; removes the path if absent there. Use only after confirming that this preserves the contribution.',{'path':{'type':'string'}},['path']),('delete_file','Delete an obsolete source file',{'path':{'type':'string'}},['path'])]
+    return [{'name':n,'description':d,'inputSchema':{'type':'object','properties':p,'required':r,'additionalProperties':False},'annotations':{'readOnlyHint':n not in ('edit_file','create_file','delete_file','restore_base'),'openWorldHint':False}} for n,d,p,r in specs]
 
 def main():
     w=Workspace(sys.argv[1],len(sys.argv)>2 and sys.argv[2]=='edit')

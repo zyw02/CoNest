@@ -97,7 +97,7 @@ class Operations:
                 p=self.work/name
                 if p.exists() and re.search(r'^(<<<<<<< |=======\s*$|>>>>>>> )',p.read_text(),re.M):raise RuntimeError('Unresolved conflict markers: '+name)
         code=self.checkpoint_source(s,'integrate current target')
-        protected=op.git(self.work,'diff','--name-only',s['base'],'HEAD','--','.github','AGENTS.md','SECURITY.md','scripts/agent-review').stdout.strip()
+        protected=op.git(self.work,'diff','--name-only',s['base'],'HEAD','--','.github','AGENTS.md','SECURITY.md','scripts/agent-review','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','.npmrc','.pnpmfile.cjs','scripts/maintenance/bootstrap.mjs','scripts/maintenance/sdk.lock.json').stdout.strip()
         if protected:raise RuntimeError('Automation policy changes require maintainer review: '+protected)
         return {'code':code,'status':'reviewing'}
 
@@ -129,12 +129,31 @@ class Operations:
         review=self.model(s,f'rereview-{s["cycle"]}','Independently review all integrated changes and repairs. Check earlier findings against current code. Source validation was '+('successful' if ok else 'unsuccessful')+'. Do not invent platform or live-model evidence.\nEarlier review: '+json.dumps(s['review']))
         return {'test_ok':ok,'test_log':log if not ok else '', 'review':review,'status':'validated' if ok else 'tests failed'}
 
+    def update_body(self,s,final):
+        live=self.check(s);original=live.get('body') or ''
+        sections=('Problem','Changes','Validation','Compatibility and risks','Related issues','Checklist')
+        evidence=f'Validated `{final}` with `{self.c["test_command"]}` in the isolated Linux workspace, followed by source re-review. GitHub CI is still required. No native Windows or paid provider inference is claimed.'
+        if all('## '+section in original for section in sections):
+            marker='<!-- conest-agent:validation -->'
+            body=original.split(marker)[0].rstrip()+'\n\n'+marker+'\n## Automated verification\n\n'+evidence+'\n'
+        else:
+            linked=re.search(r'\b(?:Closes:?|Related:)\s+(?:[\w.-]+/[\w.-]+)?#\d+\b',original,re.I)
+            related=linked.group(0) if linked else ''
+            related_prs=self.c.get('related_prs',{}).get(str(live['number']),[])
+            if not related and related_prs:related='Related: '+', '.join('#'+str(n) for n in related_prs)
+            if not related and live['title'].startswith('feat'):raise RuntimeError('Feature PR needs a related issue or PR before automated merge')
+            if not related:related='None — standalone corrective change described in the original contribution.'
+            quoted='\n'.join('> '+line for line in original.splitlines()) or '> No original description was supplied.'
+            body='## Problem\n\nOriginal contributor description:\n\n'+quoted+'\n\n## Changes\n\n'+s['review']['summary']+'\n\n## Validation\n\n'+evidence+'\n\n## Compatibility and risks\n\nThe contribution has been reconciled with the current target branch. Source review covered the affected contracts and callers. Remaining review limits: '+('; '.join(s['review']['limitations']) or 'No additional source-review coverage gaps reported.')+'\n\n## Related issues\n\n'+related+'\n\n## Checklist\n\n- [x] The integrated diff was reviewed.\n- [x] Configured local validation passed on the stated revision.\n- [x] Original contributor attribution is retained.\n- [x] Actual validation and remaining limits are stated.\n'
+        op.gh(f'repos/{self.c["repo"]}/pulls/{live["number"]}','PATCH',{'body':body})
+
     def publish(self,s):
         live=op.current(self.c,s['pr']['number'])
         self.check({**s,'final':s['code']} if live['head']['sha']==s['code'] else s)
         final=op.git(self.work,'rev-parse','HEAD').stdout.strip()
         if final!=s['code'] or op.git(self.work,'status','--porcelain').stdout.strip():raise RuntimeError('Source changed after validation')
         if not self.c['publish']:return {'status':'local complete','final':final}
+        if op.current(self.c,s['pr']['number'])['head']['sha']==s['head']:self.update_body(s,final)
         live=op.current(self.c,s['pr']['number'])
         if live['head']['sha']!=final:
             op.push(self.c,self.work,s['pr'],s['base'])
@@ -170,7 +189,8 @@ class Operations:
 
     def blocked(self,s):
         error=s.get('error') or ('Source review coverage is incomplete' if not s.get('review',{}).get('coverage_complete',True) else 'Repair limit reached with unresolved findings or test failures')
-        self.note(s,'needs attention','Automation stopped without merging.\n\n'+error[:3000]+'\n\nThe contribution remains in the original PR. Maintainer action or an explicit retry is needed.')
+        try:self.note(s,'needs attention','Automation stopped without merging.\n\n'+error[:3000]+'\n\nThe contribution remains in the original PR. Maintainer action or an explicit retry is needed.')
+        except Exception:pass
         return {'status':'blocked','error':error}
 
 
@@ -202,6 +222,24 @@ def intake(c,prs):
         op.save(path,{'head':pr['head']['sha']})
 
 
+def preserve_failure(c,s):
+    """Keep stopped edits as a patch/branch, without retaining another checkout."""
+    work=Path(c['workspace']);job=Path(s['job'])
+    if not s.get('branch') or op.git(work,'branch','--show-current').stdout.strip()!=s['branch']:return
+    if (work/'.git/MERGE_HEAD').exists():
+        (job/'recovery.patch').write_text(op.git(work,'diff','--binary','HEAD').stdout)
+        # Only this controller's incomplete integration is aborted. New model
+        # files are archived separately before allowing another branch switch.
+        new=op.git(work,'ls-files','--others','--exclude-standard','-z').stdout.split('\0')
+        for name in filter(None,new):
+            source=work/name;dest=job/'recovery-files'/name
+            if source.is_symlink() or not source.is_file():raise RuntimeError('Unexpected recovery path')
+            dest.parent.mkdir(parents=True,exist_ok=True);source.rename(dest)
+        op.git(work,'merge','--abort')
+    elif op.git(work,'status','--porcelain').stdout.strip():
+        op.commit_changes(c,work,s['pr'],s['trailers'],f'chore: retain stopped local attempt for PR #{s["pr"]["number"]}')
+
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--config',required=True);parser.add_argument('--pr',type=int,action='append');parser.add_argument('--intake',action='store_true');parser.add_argument('--retry',action='store_true');a=parser.parse_args()
     c=json.loads(Path(a.config).read_text());state=Path(c['state']);state.mkdir(parents=True,exist_ok=True)
@@ -215,7 +253,10 @@ def main():
             for pr in prs:
                 path=state/f'pr-{pr["number"]}.json';previous=json.loads(path.read_text()) if path.exists() else {}
                 base=op.base_sha(c,pr)
-                resumable=previous.get('status') in ('running','waiting for CI') and pr['head']['sha'] in (previous.get('head'),previous.get('final')) and base==previous.get('base')
+                snapshot_code=None
+                if previous.get('thread'):
+                    snapshot_code=graph.get_state({'configurable':{'thread_id':previous['thread']}}).values.get('code')
+                resumable=previous.get('status') in ('running','waiting for CI') and pr['head']['sha'] in (previous.get('head'),previous.get('final'),snapshot_code) and base==previous.get('base')
                 key=pr['head']['sha']+':'+base
                 if not a.retry and previous.get('key')==key and previous.get('status') in ('blocked','done','local complete','merged'):continue
                 if resumable:
@@ -235,6 +276,7 @@ def main():
                 result=graph.invoke(initial,cfg,durability='sync')
                 final=graph.get_state(cfg).values
                 status='waiting for CI' if result.get('__interrupt__') else final.get('status','blocked')
+                if status=='blocked':preserve_failure(c,final)
                 previous.update(status=status,final=final.get('final'),branch=final.get('branch'),error=final.get('error'),updated_at=time.time())
                 if final.get('final'):previous['key']=final['final']+':'+base
                 op.save(path,previous);print(f'PR #{pr["number"]}: {status}',flush=True)

@@ -43,7 +43,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: conest-review
-          path: .review/
+          path: |
+            .review/review.json
+            .review/review.md
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
       - name: Enforce review blockers
