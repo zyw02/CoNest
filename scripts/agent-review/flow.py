@@ -70,9 +70,12 @@ class Operations:
 
     def checkpoint_source(self,s,label):
         code=op.commit_changes(self.c,self.work,s['pr'],s['trailers'],f'fix: {label} for PR #{s["pr"]["number"]}')
+        self.verify_policy(s)
+        return code
+
+    def verify_policy(self,s):
         protected=op.git(self.work,'diff','--name-only',s['base'],'HEAD','--','.github','AGENTS.md','SECURITY.md','scripts/agent-review','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','.npmrc','.pnpmfile.cjs','scripts/maintenance/bootstrap.mjs','scripts/maintenance/sdk.lock.json').stdout.strip()
         if protected:raise RuntimeError('Automation policy changes require maintainer review: '+protected)
-        return code
 
     def model(self,s,label,prompt,edit=False):
         c={**self.c,'review_head':s['head']}
@@ -94,6 +97,7 @@ class Operations:
         self.check(s)
         # A completed local merge makes replay harmless.
         if op.git(self.work,'merge-base','--is-ancestor',s['base'],'HEAD',check=False).returncode==0:
+            self.verify_policy(s)
             return {'code':op.git(self.work,'rev-parse','HEAD').stdout.strip()}
         if not (self.work/'.git/MERGE_HEAD').exists():
             result=op.git(self.work,'-c','user.name='+self.c['assignee'],'-c','user.email='+self.c['author_email'],'merge','--no-commit','--no-ff',s['base'],check=False)
@@ -108,8 +112,6 @@ class Operations:
                 p=self.work/name
                 if p.exists() and re.search(r'^(<<<<<<< |=======\s*$|>>>>>>> )',p.read_text(),re.M):raise RuntimeError('Unresolved conflict markers: '+name)
         code=self.checkpoint_source(s,'integrate current target')
-        protected=op.git(self.work,'diff','--name-only',s['base'],'HEAD','--','.github','AGENTS.md','SECURITY.md','scripts/agent-review','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','.npmrc','.pnpmfile.cjs','scripts/maintenance/bootstrap.mjs','scripts/maintenance/sdk.lock.json').stdout.strip()
-        if protected:raise RuntimeError('Automation policy changes require maintainer review: '+protected)
         return {'code':code,'status':'reviewing'}
 
     def review(self,s):

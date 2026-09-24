@@ -51,6 +51,15 @@ class FlowTests(unittest.TestCase):
             self.assertEqual(result['status'],'blocked');self.assertEqual(ops.calls.count('repair'),2)
             self.assertNotIn('publish',ops.calls);self.assertNotIn('merge',ops.calls)
 
+    def test_already_integrated_policy_change_stops_before_review(self):
+        ops=Operations({'workspace':'/unused'})
+        def git(_work,*args,**kwargs):
+            return SimpleNamespace(returncode=0,stdout='.github/workflows/review.yml\n' if args[0]=='diff' else 'head\n')
+        with patch.object(ops,'check'),patch('runner.git',side_effect=git),patch.object(ops,'model') as model:
+            with self.assertRaisesRegex(RuntimeError,'policy changes'):
+                ops.reconcile({'base':'already-integrated','pr':{'number':1}})
+            model.assert_not_called()
+
     def test_stale_target_rejected(self):
         ops=Operations({'workspace':'/unused','repo':'o/r'})
         live={'state':'open','draft':False,'head':{'sha':'head'}}
