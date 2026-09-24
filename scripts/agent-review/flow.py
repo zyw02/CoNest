@@ -263,8 +263,9 @@ def main():
                     thread=previous['thread'];cfg={'configurable':{'thread_id':thread},'recursion_limit':80}
                     snapshot=graph.get_state(cfg);initial=None
                     if snapshot.values.get('branch'):
-                        if op.git(c['workspace'],'status','--porcelain').stdout.strip() and op.git(c['workspace'],'branch','--show-current').stdout.strip()!=snapshot.values['branch']:raise RuntimeError('Unfinished changes belong to another task')
-                        op.git(c['workspace'],'checkout',snapshot.values['branch'])
+                        if op.git(c['workspace'],'branch','--show-current').stdout.strip()!=snapshot.values['branch']:
+                            if op.git(c['workspace'],'status','--porcelain').stdout.strip():raise RuntimeError('Unfinished changes belong to another task')
+                            op.git(c['workspace'],'checkout',snapshot.values['branch'])
                     if snapshot.tasks and any(t.interrupts for t in snapshot.tasks):initial=Command(resume=True)
                 else:
                     if op.git(c['workspace'],'status','--porcelain').stdout.strip():
