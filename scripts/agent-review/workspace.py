@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A bounded MCP file interface. Never executes repository code or shell text."""
+"""Bounded source access and isolated tests; no caller-supplied shell commands."""
 import json, os, subprocess, sys, shlex
 from pathlib import Path, PurePosixPath
 
