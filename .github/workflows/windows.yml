@@ -1,0 +1,83 @@
+name: Windows integration
+on:
+  push:
+    branches: [develop]
+    paths: ['.github/workflows/windows.yml', '**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm install --global pnpm@11.7.0
+      - run: node scripts/maintenance/bootstrap.mjs
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: node scripts/prepare-native.mjs --target win32-x64 --out "$RUNNER_TEMP/native-windows"
+      - run: node scripts/pack-release.mjs --target win32-x64 --native-dir "$RUNNER_TEMP/native-windows" --out "$RUNNER_TEMP/package"
+      - run: python3 scripts/pack-windows.py --archive "$RUNNER_TEMP/package/local-conest-connector-0.6.4.tgz" --out "$RUNNER_TEMP/delivery"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conest-0.6.4-windows-x64
+          path: ${{ runner.temp }}/delivery/
+  windows:
+    needs: package
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: conest-0.6.4-windows-x64
+          path: delivery
+      - name: Record actual Windows environment
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,BuildNumber,OSArchitecture | ConvertTo-Json | Set-Content evidence/windows.json
+      - name: Install isolated OpenClaw and CoNest
+        id: install
+        shell: pwsh
+        run: ./delivery/conest-0.6.4-windows-x64/install.ps1 -InstallRoot "$env:RUNNER_TEMP/conest"
+      - name: Component graph and no-DSH acceptance
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          & "$env:RUNNER_TEMP/conest/start.ps1" -Components
+          if ($LASTEXITCODE -ne 0) { throw 'Component acceptance failed' }
+      - name: Windows native DSH and dual-loop Gateway acceptance
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: pwsh
+        run: ./delivery/conest-0.6.4-windows-x64/verify-windows.ps1 -InstallRoot "$env:RUNNER_TEMP/conest"
+      - name: OpenClaw enhancement without DSH
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          & "$env:RUNNER_TEMP/conest/start.ps1" -Verify -Core
+          if ($LASTEXITCODE -ne 0) { throw 'Core Gateway acceptance failed' }
+      - name: Collect evidence
+        if: always()
+        shell: pwsh
+        run: |
+          $Root = "$env:RUNNER_TEMP/conest"
+          if (Test-Path "$Root/components-acceptance.json") { Copy-Item "$Root/components-acceptance.json" evidence }
+          Get-ChildItem $Root -Directory -Filter 'check-state-*' -ErrorAction SilentlyContinue | ForEach-Object {
+            $Dest = Join-Path evidence $_.Name
+            New-Item -ItemType Directory -Force $Dest | Out-Null
+            foreach ($File in @('acceptance.json','model-evidence.json','launcher.log')) {
+              $Source = Join-Path $_.FullName $File
+              if (Test-Path $Source) { Copy-Item $Source $Dest }
+            }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-acceptance-evidence
+          path: evidence/

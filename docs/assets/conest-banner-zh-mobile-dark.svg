@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="520" viewBox="0 0 640 520" role="img" aria-labelledby="title desc">
+<title id="title">CoNest — Agent 的万物互联</title>
+<desc id="desc">An interconnected world for agents, tools, memory and services. A bird and woven nest represent independent capabilities working together.</desc>
+<rect x="1" y="1" width="638" height="518" rx="24" fill="#151E2D" stroke="#2D394B"/>
+<g transform="translate(0 0)">
+<g font-family="Inter,Segoe UI,Arial,Noto Sans CJK SC,sans-serif" fill="#F5F0E7">
+<text x="38" y="128" font-size="92" font-weight="750" letter-spacing="-5">CoNest<tspan fill="#FF967C">.</tspan></text>
+<text x="44" y="253" font-size="64" font-weight="600">Agent 的</text><text x="40" y="336" font-size="76" font-weight="600">万物互联</text>
+<g fill="#C1CCDA"><text x="44" y="416" font-size="32">连接智能体、工具、记忆与服务</text></g>
+</g>
+<g transform="translate(410 24) scale(.39)"><g transform="translate(0 -13.5) scale(0.40829346)">
+<path fill="#FF967C" d="M252 124C264 123 289 168 310 190C376 259 472 302 543 365C672 458 737 615 715 724C710 763 700 795 688 817C667 764 639 727 596 691C538 651 475 633 407 605C311 565 240 532 213 472C163 384 202 210 241 140Q247 125 252 124Z"/>
+<path fill="#FF967C" fill-rule="evenodd" d="M699 494C764 424 792 347 885 337C941 326 1008 344 1040 381L1126 403C1064 419 1022 457 1000 485C952 550 952 674 885 749C832 807 763 848 700 870C748 756 752 616 711 516Z M974 411A24 24 0 1 0 926 411A24 24 0 1 0 974 411Z"/>
+<path fill="#F5F0E7" d="M228 559C334 665 520 659 612 754C636 782 653 827 664 875C585 894 477 866 404 833C304 792 258 744 236 679C224 640 214 582 218 567Q222 557 228 559Z"/>
+<path fill="#F5F0E7" d="M580 892C763 868 939 770 1047 658Q1068 644 1078 662C1097 747 1027 856 978 918Q960 940 936 951C825 943 690 930 580 892Z"/>
+<path fill="#F5F0E7" d="M134 653C183 694 204 731 246 764C355 866 559 913 807 980C731 1016 676 1061 619 1113C443 1057 264 1005 186 904C128 829 106 724 119 671Q124 650 134 653Z"/>
+<path fill="#F5F0E7" d="M159 891C253 1004 392 1067 545 1124C474 1157 415 1180 345 1194C258 1163 198 1095 166 1023C148 977 151 921 159 891Z"/>
+<path fill="#F5F0E7" d="M1049 889C1010 1044 874 1160 721 1191C643 1209 541 1204 477 1196C692 1129 885 1015 1049 889Z"/>
+</g></g>
+</g>
+</svg>

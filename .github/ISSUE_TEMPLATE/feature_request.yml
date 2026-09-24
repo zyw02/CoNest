@@ -1,0 +1,39 @@
+name: Feature request
+description: Discuss a capability or public contract before substantial implementation.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who is blocked, what task are they trying to complete, and what currently happens?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Proposed outcome and acceptance criteria
+      description: Describe observable behavior and the smallest useful scope. Keep internal proposals and customer plans out of this issue.
+    validations:
+      required: true
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration and compatibility
+      description: Affected agents, tools or services; public interfaces, permissions, state and platform implications. Could an optional component provide it?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and existing work
+      description: Existing issues, workarounds, relevant prior art and tradeoffs.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing requests and included no internal or customer materials.
+          required: true

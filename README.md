@@ -1,115 +1,119 @@
 <div align="center">
 
-**English** · [简体中文](README-zh.md)
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/assets/conest-banner-mobile-dark.svg" />
+  <source media="(max-width: 600px)" srcset="docs/assets/conest-banner-mobile.svg" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/conest-banner-dark.svg" />
+  <img src="docs/assets/conest-banner.svg" alt="CoNest — Connect the agent world. Agents, tools, memory and services." width="100%" />
+</picture>
 
-<img src="docs/assets/conest-banner.svg" alt="CoNest — Two loops. One workspace." width="100%" />
+**English** &nbsp; / &nbsp; [简体中文](README-zh.md)
 
-**Two agent loops · Shared tools and memory · One component runtime**
+[![Build](https://img.shields.io/github/actions/workflow/status/zyw02/CoNest/repository.yml?branch=develop&style=flat-square&logo=github&label=build&labelColor=252638&color=65b9a2)](https://github.com/zyw02/CoNest/actions/workflows/repository.yml) [![Node 24.16](https://img.shields.io/badge/Node-24.16-65b9a2?style=flat-square&logo=nodedotjs&logoColor=white&labelColor=252638)](https://nodejs.org/) [![pnpm 11.7](https://img.shields.io/badge/pnpm-11.7-e8b86d?style=flat-square&logo=pnpm&logoColor=white&labelColor=252638)](https://pnpm.io/) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-a392eb?style=flat-square&labelColor=252638)](CONTRIBUTING.md)
 
-[![Build](https://github.com/zyw02/CoNest/actions/workflows/repository.yml/badge.svg?branch=main)](https://github.com/zyw02/CoNest/actions/workflows/repository.yml)
-[![OpenClaw](https://img.shields.io/badge/OpenClaw-2026.9.2-4388cc?style=flat-square)](https://www.npmjs.com/package/openclaw/v/2026.9.2)
-![Node](https://img.shields.io/badge/Node-24.15-438b59?style=flat-square)
-![pnpm](https://img.shields.io/badge/pnpm-11.7-f1ac38?style=flat-square)
-[![Contributions](https://img.shields.io/badge/PRs-welcome-56bba0?style=flat-square)](CONTRIBUTING.md)
+<br />
 
-[Quick start](#quick-start) · [Branches](#branches) · [Contribute](CONTRIBUTING.md) · [Studio guide (中文)](bridge/STUDIO-zh.md) · [Issues](https://github.com/zyw02/CoNest/issues)
+<a href="#quick-start"><strong>Quick start</strong></a> &nbsp;·&nbsp; <a href="#quick-start"><strong>Studio</strong></a> &nbsp;·&nbsp; <a href="#branches"><strong>Capabilities</strong></a> &nbsp;·&nbsp; <a href="CONTRIBUTING.md"><strong>Contribute</strong></a> &nbsp;·&nbsp; <a href="https://github.com/zyw02/CoNest/issues"><strong>Issues</strong></a>
 
 </div>
 
----
+<br />
 
-CoNest connects **OpenClaw** with **DeepSeek Harness (DSH)**. Choose an agent loop, use tools from both ecosystems, and share memory between tasks in one workspace. CoNest Runtime manages the underlying Cordis components; Studio provides the interface and execution history.
+**CoNest is building an interconnected world for agents.** Our goal is to connect agents across frameworks and runtimes, so tools, memory, services and workflows can be discovered, invoked and composed into capabilities that work together.
 
-<table>
-<tr><td width="50%">
+**Available today:** OpenClaw and DeepSeek Harness (DSH) connect through a shared component and runtime model. A Cordis-based runtime composes tools, memory and services; CoNest Host coordinates Agent sessions and component execution; Studio presents the resulting capability catalog and execution history.
 
-### ↔ Choose your execution loop
+CoNest is intended to become the capability fabric and task control plane between Agent runtimes, reusable services and OS execution nodes. It serves durable work that crosses runtimes, machines, trust boundaries and business systems while retaining one identity, policy, operation history and deliverable state.
 
-Switch between the native OpenClaw loop and DSH. Follow actual task results in Studio.
+CoNest is being built for:
 
-</td><td width="50%">
+- **Cross-runtime enterprise delivery** — combine private data, specialist Agents, local applications, approval and business-system submission into one recoverable task.
+- **Long-running operations** — coordinate coding, diagnosis, infrastructure and human decisions across partial failure, cancellation, retry and handoff.
+- **Cross-device and edge execution** — place sensitive work on the right workstation, server or device while cloud Agents continue to plan and collaborate.
 
-### ◈ Build with components
+CoNest defines a common component manifest and runtime protocol across Agent SDKs. OpenClaw and DSH/Cordis connect through focused adapters, while the machine-readable [compatibility policy](compatibility.json) records qualified versions. A daily GitHub Actions watch resolves and tests the current OpenClaw and DSH releases alongside every maintained baseline, keeping the adapters current as upstream projects evolve.
 
-A dedicated worker manages component discovery, invocation, lifecycle and permissions. Configure capabilities through the runtime.
+> [!TIP]
+> **Explore 0.6.4** — Gateway + CoNest Host, composable office services, shared memory, and a focused OpenClaw + Core experience via `--core`.
 
-</td></tr>
-<tr><td>
+## Capabilities, connected
 
-### ◎ Keep context across tasks
+- **[Connect agents](docs/README.md)** — Extend access across frameworks and runtimes, starting with OpenClaw and DSH execution and tool interoperability.
 
-Share a knowledge graph with automatic memory capture and recall, so tasks can use recorded project decisions and preferences.
+- **[Compose tools & services](docs/README.md)** — Build reusable components. The runtime manages dependencies, invocation and lifecycle so services can work together.
 
-</td><td>
+- **[Let knowledge accumulate](#quick-start)** — Capture and recall a shared knowledge graph so tasks can build on recorded knowledge, decisions and experience.
 
-### ⌘ Work in one interface
+- **[See how capabilities work](#quick-start)** — Browse tool and component catalogs, task results and the activity timeline in Studio.
 
-Explore tool and ecosystem catalogs, switch loops, and follow the activity timeline. The companion DSH Web plugin displays the same Studio.
+<details>
+<summary><strong>Runtime architecture</strong> · Gateway / Host / component compositions</summary>
 
-</td></tr>
-</table>
+Version 0.6.4 uses **two persistent application processes: Gateway and CoNest Host**. DSH Agent / Session runs inside Host alongside Management, Runtime and the selected component composition.
+
+The standard launch composes DSH execution, shared memory, guarded file access and workspace search. The `--core` launch composes the OpenClaw connection with reusable Cordis office services. Both demonstrate lifecycle management and a consistent dependency graph for every call.
+
+</details>
+
+<a name="quick-start"></a>
 
 ## Quick start
 
-Validated development environment: **Linux x64, Node.js 24.15.0 and pnpm 11.7.0**. Install Git and tar; native builds also require Python 3, make and a C++ compiler. Windows and RHEL 8 release packages have separate platform requirements and validation.
+**New here? This section is all you need to start.** The validated source environment is Linux x64, Node.js 24.16.0 and pnpm 11.7.0. Install Git, tar, Python 3, make and a C++ compiler for native dependencies.
 
 ```bash
-# Use develop to contribute; use main for the stable baseline.
 git clone --branch develop https://github.com/zyw02/CoNest.git
 cd CoNest
-
-# Download and verify the pinned DSH SDK.
-node maintenance/bootstrap.mjs
-
-# Install locked dependencies, build and test.
-pnpm --dir bridge install --frozen-lockfile
-pnpm --dir bridge run build
-pnpm --dir bridge exec tsx --test 'test/*.test.ts'
+node scripts/maintenance/bootstrap.mjs
+pnpm install --frozen-lockfile
+pnpm build
+CONEST_DEMO_STATE="$PWD/.local/studio" \
+  pnpm start
 ```
 
-The SDK contains the required DSH source, JavaScript runtime, types and licenses, approximately 2.3 MB compressed. Ordinary dependencies come from npm. Both the SDK and package lockfile are pinned. See [dependency provenance (中文)](maintenance/DEPENDENCIES-zh.md).
+Open the Studio URL printed in the terminal. Enter the Gateway token from the printed `connection.json` location in its connection settings. The default port is 18791; override it with `CONEST_DEMO_PORT`. Stop the local launcher with Ctrl+C. The ignored `.local/studio/` directory holds the fixture workspace, configuration and memory; do not point it at customer data or commit its contents.
 
-After building, run the four Studio acceptance scenarios with a disposable state directory:
+The default model is a local fixture: no API key is needed, while Gateway, tools and persistence execute normally. Append `--verify` to the last command for an automated check that exits when finished. Live-model use requires an owner-readable file containing `DEEPSEEK_API_KEY`, selected by `CONEST_CREDENTIAL_FILE` and an explicit `--live` flag; it incurs API usage.
 
-```bash
-CONEST_DEMO_STATE=/absolute/disposable/conest-studio \
-  pnpm --dir bridge exec node scripts/demo-studio.mjs --verify
-```
+If startup fails, check Node/pnpm versions, port availability and the terminal error. See [dependency maintenance](docs/dependencies.md) for SDK download problems or [host configuration](docs/host-integration.md#plugin-configuration) for an existing Gateway. For further help, use the [Question form](https://github.com/zyw02/CoNest/issues/new?template=question.yml) with versions, commands and redacted errors.
 
-The default uses a **local model fixture**: Gateway, loops, tools and persistence execute normally without paid model calls. See the [Studio guide (中文)](bridge/STUDIO-zh.md) and [plugin README](bridge/README.md) for installation and model configuration.
+<a name="branches"></a>
 
-## Branches
+## Capability map
 
-| Capability | `main` · 0.6.2 stable baseline | `develop` · 0.6.3 development |
-|---|---|---|
-| OpenClaw / DSH loops and Studio | ✓ | ✓ |
-| Shared memory | Runs in Gateway | Dedicated `dsh-memory` component |
-| Component workspace search | `knowledge_search` and verification | Also serves `dsh_grep` and `dsh_glob` |
-| Text reads | Run in Gateway | Dedicated `dsh-read`, with guarded-edit observations |
-| Dynamic component access from DSH loop | Pending | Host tool admission and component worker connected |
-| Clean-clone dependency recovery and builds | ✓ | ✓ |
+| Layer | What CoNest enables | Current implementation |
+| :--- | :--- | :--- |
+| Agent connectivity | Route tasks and capability calls across Agent runtimes | OpenClaw Gateway and DSH Agent / Session adapters |
+| Component composition | Discover services and manage their dependencies and lifecycle | Cordis-based runtime and CoNest component manifests |
+| Tool interoperability | Share workspace, search, reading and office capabilities | `knowledge_search`, `dsh_grep`, `dsh_glob`, `dsh-read` and office components |
+| Shared memory | Carry recorded knowledge and decisions across task execution | `dsh-memory`, knowledge graph storage and Gateway persistence |
+| Task execution | Admit tools and run dynamic components inside a managed host | CoNest Host, component worker and session orchestration |
+| Observability | Inspect available capabilities, results and activity | CoNest Studio catalogs and execution timeline |
 
-You are viewing **main**. The original `v0.6.2` tag preserves the initial backup; branch maintenance continues independently of packaged releases.
+<a href="https://github.com/zyw02/CoNest/tree/main"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/git-branch-dark.svg" /><img src="docs/assets/readme/git-branch.svg" width="16" height="16" align="absmiddle" alt="" /></picture> <code>main</code></a> and <a href="https://github.com/zyw02/CoNest/tree/develop"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/git-branch-dark.svg" /><img src="docs/assets/readme/git-branch.svg" width="16" height="16" align="absmiddle" alt="" /></picture> <code>develop</code></a> currently share the 0.6.4 implementation. `main` is the stable entry point; `develop` is the integration branch for the next reviewed change.
 
-## Explore
+## What should I read?
 
-| Goal | Start here |
-|---|---|
-| Change code, run checks and submit a PR | [Contributing](CONTRIBUTING.md) |
-| Understand SDK verification and third-party licenses | [Dependencies (中文)](maintenance/DEPENDENCIES-zh.md) |
-| Configure the plugin and components | [Plugin README](bridge/README.md) |
-| Try both loops and shared memory | [Studio (中文)](bridge/STUDIO-zh.md) |
-| Understand permissions and invocation boundaries | [Authorization](bridge/AUTHORIZATION.md) |
-| Inspect the original source import | [Import provenance (中文)](maintenance/IMPORT-zh.md) |
+- **Run CoNest:** [Quick start](#quick-start) on this page, also available in [Chinese](README-zh.md).
+- **Report a problem or submit a PR:** [CONTRIBUTING](CONTRIBUTING.md), the single collaboration policy.
+- **Change implementation details:** [Developer reference index](docs/README.md), organized by components, host integration and packaging.
 
-Git contains source, tests, documentation and build configuration. Historical release packages, private acceptance reports and personal runtime data are distributed or retained separately. Old links into `releases/` and `reports/` require the corresponding delivery materials.
+[MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Security](SECURITY.md)
+
+<br />
 
 ---
 
 <div align="center">
 
-**Build together, one capability at a time.**
+<img src="docs/assets/brand/conest-avatar.svg" width="64" height="64" alt="CoNest" />
 
-Start on `develop` · Validate before merging into `main` · Tag releases
+**Build an interconnected world for agents.**
+
+Start with a component, an idea, or your first pull request.
+
+[Contribute →](CONTRIBUTING.md) &nbsp;·&nbsp; [Report an issue →](https://github.com/zyw02/CoNest/issues)
+
+<sub>Agents · Tools · Memory · Services &nbsp; / &nbsp; CoNest</sub>
 
 </div>

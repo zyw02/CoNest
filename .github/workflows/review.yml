@@ -1,0 +1,54 @@
+name: CoNest Review
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conest-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@11.7.0
+      - name: Restore verified DSH adapter SDK
+        run: node scripts/maintenance/bootstrap.mjs
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Review changed contracts and repository boundaries
+        id: policy
+        continue-on-error: true
+        run: pnpm review -- --base "origin/${{ github.base_ref }}" --head "${{ github.event.pull_request.head.sha }}" --output .review
+      - name: Run repository and type checks
+        run: pnpm check
+      - name: Run behavior tests
+        run: pnpm test
+      - name: Upload review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conest-review
+          path: |
+            .review/review.json
+            .review/review.md
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Enforce review blockers
+        if: always() && steps.policy.outcome == 'failure'
+        run: exit 1

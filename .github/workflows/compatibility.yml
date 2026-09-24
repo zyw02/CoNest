@@ -1,0 +1,100 @@
+name: Agent compatibility
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  push:
+    branches: [main, develop]
+    paths: [compatibility.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, 'src/adapters/**', 'src/compatibility.ts', 'src/dsh-search-component.ts', 'src/studio/**', 'scripts/build-studio.mjs', 'test/compatibility.test.ts', 'test/select-dsh-version.test.mjs', 'scripts/maintenance/select-dsh-version.mjs', '.github/workflows/compatibility.yml']
+  pull_request:
+    branches: [main, develop]
+    paths: [compatibility.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, 'src/adapters/**', 'src/compatibility.ts', 'src/dsh-search-component.ts', 'src/studio/**', 'scripts/build-studio.mjs', 'test/compatibility.test.ts', 'test/select-dsh-version.test.mjs', 'scripts/maintenance/select-dsh-version.mjs', '.github/workflows/compatibility.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  openclaw-versions:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - id: resolve
+        name: Resolve baseline and current OpenClaw releases
+        shell: bash
+        run: |
+          latest="$(npm view openclaw version --json)"
+          matrix="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(JSON.stringify([...new Set(["2026.9.2",v])]))' "$latest")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+  openclaw:
+    needs: openclaw-versions
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.openclaw-versions.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm install --global pnpm@11.7.0
+      - name: Restore verified DSH adapter SDK
+        run: node scripts/maintenance/bootstrap.mjs
+      - run: pnpm install --frozen-lockfile
+      - name: Select OpenClaw ${{ matrix.version }} without changing repository locks
+        run: pnpm add --save-dev --ignore-workspace-root-check --lockfile=false "openclaw@${{ matrix.version }}"
+      - run: pnpm build
+      - run: pnpm exec tsx --test test/compatibility.test.ts test/host-adapter.test.ts
+      - run: node scripts/test-openclaw.mjs
+  dsh-versions:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: resolve
+        name: Resolve qualified and current DSH releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          latest_tag="$(gh api 'repos/deepseek-ai/deepseek-harness/releases?per_page=20' --jq '[.[] | select(.draft == false)][0].tag_name')"
+          latest_version="${latest_tag#dsh-v}"
+          latest_revision="$(gh api "repos/deepseek-ai/deepseek-harness/commits/${latest_tag}" --jq .sha)"
+          node -e 'const d=require("./compatibility.json").adapters.dsh; const latest={version:process.argv[1],source:"upstream-latest",revision:process.argv[2]}; const include=d.qualifications.some(x=>x.version===latest.version)?d.qualifications:[...d.qualifications,latest]; process.stdout.write(`matrix=${JSON.stringify({include})}\n`)' "$latest_version" "$latest_revision" >> "$GITHUB_OUTPUT"
+  dsh:
+    needs: dsh-versions
+    name: dsh (${{ matrix.version }} / ${{ matrix.source }})
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.dsh-versions.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm install --global pnpm@11.7.0
+      - name: Restore frozen DSH SDK
+        if: matrix.source == 'frozen-sdk'
+        run: node scripts/maintenance/bootstrap.mjs
+      - name: Select public DSH release
+        if: startsWith(matrix.source, 'upstream-')
+        run: node scripts/maintenance/select-dsh-version.mjs "${{ matrix.version }}" "${{ matrix.revision }}"
+      - name: Install frozen dependency graph
+        if: matrix.source == 'frozen-sdk'
+        run: pnpm install --frozen-lockfile
+      - name: Install public DSH dependency graph
+        if: startsWith(matrix.source, 'upstream-')
+        run: pnpm install --lockfile=false
+      - run: pnpm test:dsh-matrix

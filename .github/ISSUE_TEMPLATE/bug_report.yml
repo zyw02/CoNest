@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible defect, regression or documentation error.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: Search existing reports first. Use synthetic data and redact credentials. For vulnerabilities, follow CONTRIBUTING.md before sharing details.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options: [Startup or installation, Components or lifecycle, Host integration or permissions, Studio, Packaging or platform support, Documentation, Other implementation]
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and environment
+      description: CoNest branch/version/commit, OS/architecture, Node, pnpm, OpenClaw, and fixture or live-model mode when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Numbered commands, minimal configuration and synthetic inputs. For documentation, include the page and section.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and impact
+      description: Include short, redacted errors. For UI defects, attach a focused screenshot with viewport details.
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: Regression range and checks tried
+      description: Last working and first failing versions, or state unknown. List relevant existing reports and attempted checks.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing reports and removed private data, credentials and internal/customer documents.
+          required: true

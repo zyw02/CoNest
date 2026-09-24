@@ -1,0 +1,8 @@
+[Unit]
+Description=Check the CoNest PR queue
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=30s
+AccuracySec=1s
+[Install]
+WantedBy=timers.target
