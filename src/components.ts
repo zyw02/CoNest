@@ -1,4 +1,4 @@
-import { Context, type CordisContext, type Fiber } from './adapters/dsh-cordis.js';
+import { settleFiber, Context, type CordisContext, type Fiber } from './adapters/dsh-cordis.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Ajv, type ValidateFunction } from 'ajv';
 import semver from 'semver';
@@ -194,7 +194,7 @@ export async function startFiber(ctx: Context, plugin: object, config: JsonObjec
   let timer: NodeJS.Timeout | undefined;
   try {
     await Promise.race([
-      fiber,
+      settleFiber(fiber),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => reject(new BridgeError('COMPONENT_START_TIMEOUT', 'Component activation exceeded its startup deadline')), timeoutMs);
         timer.unref();

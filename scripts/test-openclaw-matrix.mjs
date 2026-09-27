@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { cp, symlink, readFile, mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { cp, symlink, realpath, readFile, mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { reportDirectory, reportPath } from './report-path.mjs';
 
 const require = createRequire(import.meta.url);
@@ -22,7 +22,8 @@ const providerVersion = JSON.parse(await readFile(new URL('../node_modules/@open
 assert.equal(providerVersion, expected.replace(/-\d+$/, ''), 'Use the provider release matching the runtime host');
 const report = { version, providerVersion, platform: process.platform, node: process.version, stages: [], passed: true };
 await mkdir(reportDirectory, { recursive: true });
-const state = await mkdtemp(path.join(tmpdir(), 'conest-matrix-studio-'));
+// Canonicalize Windows 8.3 temp aliases before the host checks plugin containment.
+const state = await realpath(await mkdtemp(path.join(tmpdir(), 'conest-matrix-studio-')));
 const listener = createServer();
 await new Promise((resolve, reject) => { listener.once('error', reject); listener.listen(0, '127.0.0.1', resolve); });
 const port = listener.address().port;

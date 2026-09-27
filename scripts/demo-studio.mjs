@@ -103,8 +103,8 @@ try{
   const activity=await request('/activity');
   for (const index of coreOnly?[]:[0,3]) {
     const events=activity.activity.filter(e=>e.sessionKey===completed[index].sessionKey&&e.kind==='tool.end');
-    assert.ok(events.some(e=>e.tool==='read'&&e.state==='completed'),'Native read did not execute');
-    assert.ok(events.some(e=>e.tool==='dsh_grep'&&e.state==='completed'),'DSH grep did not execute');
+    assert.ok(events.some(e=>e.tool==='read'&&e.state==='completed'),'Native read did not execute: '+JSON.stringify(events));
+    assert.ok(events.some(e=>e.tool==='dsh_grep'&&e.state==='completed'),'DSH grep did not execute: '+JSON.stringify(events));
   }
   if(!coreOnly) { assert.equal(activity.memory.length,1,'Recall questions must not be captured as memories');
   assert.ok(activity.memory.some(m=>m.includes('青竹')));assert.ok(completed[2].text.includes('青竹')); }

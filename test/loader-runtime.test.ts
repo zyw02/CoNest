@@ -1,3 +1,4 @@
+import { Context, settleFiber } from '../src/adapters/dsh-cordis.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { EventEmitter } from 'node:events';
@@ -370,4 +371,25 @@ test('undeclared actual service injection is not satisfied from an unrelated acc
   await assert.rejects(f.runtime.reload(f.config({}, {}, [f.a, f.b, f.c, implicit])), hasCode('UPGRADE_REJECTED'));
   assert.equal(((await f.read('b_read')).value as Record<string, unknown>).value, 'a1');
   assert.equal(f.resources.filter(r => r.id === 'a').length, 1);
+});
+
+
+test('Cordis activation waits for asynchronous setup and propagates startup failures', async t => {
+  const context = new Context();
+  t.after(() => context.fiber.dispose());
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let ready = false;
+  const activation = settleFiber(context.plugin({ async apply() {
+    await gate;
+    ready = true;
+  } }));
+  await Promise.resolve();
+  assert.equal(ready, false);
+  release();
+  await activation;
+  assert.equal(ready, true);
+  await assert.rejects(settleFiber(context.plugin({ async apply() {
+    throw new Error('fixture startup failed');
+  } })), /fixture startup failed/);
 });

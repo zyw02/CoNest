@@ -1,4 +1,4 @@
-import { Context, type CordisContext, type Fiber } from './adapters/dsh-cordis.js';
+import { settleFiber, Context, type CordisContext, type Fiber } from './adapters/dsh-cordis.js';
 import { McpClient, SystemPrompt } from './adapters/dsh-memory.js';
 import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
 import { mkdir, realpath, stat } from 'node:fs/promises';
@@ -37,14 +37,14 @@ async function borrow(file: string): Promise<{ backend: Backend; release(): Prom
         finally { await releaseLock(lock, nonce); }
       };
       try {
-        fibers.push(await ctx.plugin(SystemPrompt));
-        fibers.push(await ctx.plugin(ToolRuntime, { mode: 'native' }));
-        fibers.push(await ctx.plugin(McpClient, {
+        fibers.push(await settleFiber(ctx.plugin(SystemPrompt)));
+        fibers.push(await settleFiber(ctx.plugin(ToolRuntime, { mode: 'native' })));
+        fibers.push(await settleFiber(ctx.plugin(McpClient, {
           transport: 'stdio', serverName: 'reference_memory', command: process.execPath,
           args: [fileURLToPath(new URL('./mcp-memory-server.mjs', import.meta.url))],
           cwd: path.dirname(file), env: { MEMORY_FILE_PATH: file }, toolCallTimeoutMs: 30_000,
           failOnStartupError: true, reconnect: { enabled: false },
-        }));
+        })));
         backend = { ctx, refs: 0, tail: Promise.resolve(), close: dispose };
         backends.set(file, backend);
       } catch (error) { await dispose(); throw error; }
