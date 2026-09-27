@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { openClawApiVersion, openClawContractForVersion, supportsGatewayRuntimePatch, usesLegacyAgentList } from '../src/adapters/openclaw-version.js';
 import {
   DSH_COMPATIBILITY_RANGE,
   DSH_TESTED_VERSION,
@@ -24,6 +25,23 @@ test('accepts supported OpenClaw releases without requiring the build pin', () =
   assert.throws(() => inspectOpenClaw('2026.7.1-beta.6'), /prerelease/);
   assert.equal(inspectOpenClaw('2026.10.0').tested, false);
   assert.throws(() => inspectOpenClaw('2027.1.0'), /outside CoNest's supported range/);
+});
+
+test('numeric OpenClaw repacks use their base release at each host API boundary', () => {
+  for (const [repack, base] of [
+    ['2026.7.1-1', '2026.7.1'],
+    ['2026.8.1-1', '2026.8.1'],
+    ['2026.9.2-1', '2026.9.2'],
+    ['2026.9.5-1', '2026.9.5'],
+  ]) {
+    assert.equal(openClawApiVersion(repack), base);
+    assert.equal(openClawContractForVersion(repack), openClawContractForVersion(base));
+    assert.equal(usesLegacyAgentList(repack), usesLegacyAgentList(base));
+    assert.equal(supportsGatewayRuntimePatch(repack), supportsGatewayRuntimePatch(base));
+  }
+  assert.equal(usesLegacyAgentList('2026.8.1-1'), false);
+  assert.equal(openClawContractForVersion('2026.9.2-1'), 'scoped-v2');
+  assert.equal(supportsGatewayRuntimePatch('2026.9.5-1'), true);
 });
 
 test('handles prerelease DSH versions with an explicit adapter range', () => {

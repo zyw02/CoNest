@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import semver from 'semver';
-import { openClawContract, openClawVersion } from './openclaw-version.js';
+import { openClawContract, openClawVersion, supportsGatewayRuntimePatch } from './openclaw-version.js';
 
 /** Legacy Gateways classify plugin inventory as an administrative method. */
 export function gatewayRequestScopes(method: string): Array<'operator.read' | 'operator.write' | 'operator.admin'> {
@@ -16,7 +15,7 @@ type GatewayRequest = <T = Record<string, unknown>>(method: string, params: Reco
 export async function selectGatewayAgentRuntime(request: GatewayRequest, options: {
   sessionKey: string; model: string; runtime: 'openclaw' | 'dsh';
 }): Promise<void> {
-  if (semver.gte(openClawVersion, '2026.9.5')) {
+  if (supportsGatewayRuntimePatch(openClawVersion)) {
     // DSH follows the authored model route; null clears a previous override.
     await request('sessions.patch', { key: options.sessionKey, model: options.model,
       agentRuntime: options.runtime === 'dsh' ? null : 'openclaw' });

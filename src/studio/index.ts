@@ -1,6 +1,6 @@
 import { gatewayRequestScopes, selectGatewayAgentRuntime } from '../adapters/openclaw-gateway.js';
 import type { MemoryAccess } from '../memory-adapter.js';
-import { callGatewayFromCli, isIncognitoSessionKey, type OpenClawPluginApi } from '../adapters/openclaw-sdk.js';
+import { callGatewayFromCli, isIncognitoSessionKey, resolveControlUiSurface, type OpenClawPluginApi } from '../adapters/openclaw-sdk.js';
 import { mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import type { ReadObservation } from '../read-contract.js';
@@ -215,7 +215,7 @@ export function registerStudio(api: OpenClawPluginApi, workspaceRoot: string, ru
       return true;
     },
   });
-  api.session.controls.registerControlUiDescriptor({ surface: 'tab', id: 'conest-studio', label: 'CoNest Studio',
+  api.session.controls.registerControlUiDescriptor({ surface: resolveControlUiSurface(), id: 'conest-studio', label: 'CoNest Studio',
     description: '统一生态 · 双 Loop · 共享记忆', path: PREFIX, icon: 'sparkles', group: 'agent', order: 5, requiredScopes: ['operator.read'] });
   return { observeRead: (receipt, sessionKey, signal) => host.observeRead(receipt, sessionKey, signal) };
 }
