@@ -2,7 +2,7 @@ import type { AnyAgentTool } from "../adapters/openclaw-sdk.js";
 import type { Agent, AgentHandle } from "../adapters/dsh-agent.js";
 import type { ApprovalOutcome, ApprovalRequest } from "../adapters/dsh-approval.js";
 import { createUserMessage, type ContentBlock } from "../adapters/dsh-llm.js";
-import { Session, SessionId, sessionEventsSince, type SessionEvent } from "../adapters/dsh-session.js";
+import { Session, SessionId, sessionEventsSince, toolResultBlocks, type SessionEvent } from "../adapters/dsh-session.js";
 import { ToolCallId, type ToolExecutionResult } from "../adapters/dsh-tools.js";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -542,7 +542,7 @@ async function summarizeAgentRun(
     ),
     toolResults: events.flatMap((event) =>
       event.type === "tool/result"
-        ? event.data.message.content.map((block) => ({
+        ? toolResultBlocks(event).map((block) => ({
             callId: block.toolCallId,
             text: messageText(block.content),
             isError: block.isError === true,

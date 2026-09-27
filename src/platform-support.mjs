@@ -15,7 +15,11 @@ async function acl(file, protect) {
     $p = $env:CONEST_ACL_PATH
     $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     $allowed = @($sid, 'S-1-5-18', 'S-1-5-32-544')
-    $a = Get-Acl -LiteralPath $p
+    $a = if ([System.IO.Directory]::Exists($p)) {
+      [System.IO.Directory]::GetAccessControl($p)
+    } else {
+      [System.IO.File]::GetAccessControl($p)
+    }
   `;
   const update = `
     $a.SetAccessRuleProtection($true, $false)
@@ -27,7 +31,7 @@ async function acl(file, protect) {
       $r = [System.Security.AccessControl.FileSystemAccessRule]::new($who, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
       $a.AddAccessRule($r)
     }
-    Set-Acl -LiteralPath $p -AclObject $a
+    [System.IO.Directory]::SetAccessControl($p, $a)
   `;
   const verify = `
     foreach ($r in $a.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {

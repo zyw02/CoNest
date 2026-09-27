@@ -31,3 +31,8 @@ export function createDetachedSession(id: SessionId, cwd: string): Session {
     isSeeded: false,
   });
 }
+
+/** Newer session events may include commentary beside the tool result. */
+export function toolResultBlocks(event: Extract<SessionEvent, { type: 'tool/result' }>) {
+  return event.data.message.content.filter(block => block.type === 'tool-result');
+}
