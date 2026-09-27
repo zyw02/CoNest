@@ -1,3 +1,4 @@
+import { openClawContract } from '../src/adapters/openclaw-version.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
@@ -106,7 +107,7 @@ test('call and run bindings reject a changed session identity instead of rebindi
   try {
     f.scopes.restrictRun('run', [], { sessionId: 'old', agentId: 'main' });
     assert.throws(() => f.scopes.restrictRun('run', [], { sessionId: 'new', agentId: 'main' }), /session identity changed/);
-    f.scopes.observe('call', undefined, undefined, undefined, { sessionId: 'old', agentId: 'main' });
+    f.scopes.observe('call', { session: { sessionId: 'old', agentId: 'main' } });
     assert.throws(() => f.scopes.claim('call', undefined, { sessionId: 'new' }), /session identity changed/);
     const binding = f.scopes.claim('call', undefined, { sessionId: 'old' });
     f.scopes.endSession({ sessionId: 'old', agentId: 'main' });
@@ -118,7 +119,7 @@ test('session-scoped runtime cleanup cannot be treated as plugin unload or cance
   const f = fixture();
   try {
     f.scopes.restrictRun('new-run', [], { sessionId: 'new-id', agentId: 'main' });
-    f.scopes.observe('new-call', 'new-run', undefined, undefined, { sessionId: 'new-id', agentId: 'main' });
+    f.scopes.observe('new-call', { runId: 'new-run', session: { sessionId: 'new-id', agentId: 'main' } });
     const binding = f.scopes.claim('new-call');
     assert.equal(cleanupHostScope({ sessionKey: 'reused-key' }, f.scopes), true, 'The caller must keep its worker/registry registration alive');
     assert.equal(binding.signal.aborted, false);
@@ -141,5 +142,39 @@ test('finalized search-tool denials also bind generic invocation and retain per-
     assert.deepEqual(binding.principal, { kind: 'agent', agentId: 'main' });
     f.fire('after_tool_call', { toolName: 'dsh_grep' }, context);
     assert.equal(binding.signal.aborted, true);
+  } finally { f.scopes.close(); }
+});
+
+
+test('call compatibility restrictions cannot replace or widen a finalized run snapshot', () => {
+  const f = fixture();
+  try {
+    f.scopes.restrictRun('run', ['knowledge_search']);
+    f.scopes.observe('call', { runId: 'run', capabilityDenials: ['dsh_read'] });
+    f.scopes.observe('call', { runId: 'run', capabilityDenials: [] });
+    const bound = f.scopes.claim('call');
+    assert.deepEqual(f.scopes.runDenials(bound.runId, bound.capabilityDenials).sort(), ['dsh_read', 'knowledge_search']);
+    assert.throws(() => f.scopes.runDenials('unknown'), /no current finalized/);
+    assert.deepEqual(f.scopes.runDenials('legacy', ['dsh_read']), ['dsh_read']);
+    f.scopes.endRun('run');
+    assert.equal(bound.signal.aborted, true);
+  } finally { f.scopes.close(); }
+});
+
+test('legacy admission grants only the named direct capability and never a generic alias', () => {
+  const f = fixture();
+  try {
+    for (const name of ['dsh_read', 'bridge_invoke']) {
+      const context = { runId: `run-${name}`, sessionKey: 'session', agentId: 'main', toolCallId: name };
+      f.fire('before_tool_call', { toolName: name }, context);
+      const binding = f.scopes.claim(scopedCallId(context, name));
+      if (openClawContract === 'legacy-v1') {
+        const deny = f.scopes.runDenials(binding.runId, binding.capabilityDenials);
+        assert.equal(deny.includes('dsh_read'), name !== 'dsh_read');
+        assert.ok(deny.includes('knowledge_search'));
+      } else {
+        assert.throws(() => f.scopes.runDenials(binding.runId, binding.capabilityDenials), /no current finalized/);
+      }
+    }
   } finally { f.scopes.close(); }
 });

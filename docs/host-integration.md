@@ -225,3 +225,47 @@ CONEST_REPORT_PROFILE=context-provider-default node scripts/test-openclaw.mjs
 Unit/process tests cover exact data boundaries, identity/tool/workspace gates, output validation, timed-out late work, concurrency, run cancellation, stale generations, real DSH retrieval, dependency disable/recovery, requester denial and in-flight upgrade/policy revocation. Gateway tests use a local deterministic model transport and actual OpenClaw/DSH execution, including context arriving before model tool calls and fresh-session checks after enable/disable, revocation/restoration and uninstall. They do not spend provider credits or measure real-model retrieval quality.
 
 No session/history service, arbitrary multi-provider pipeline, prompt-authoring DSH service adapter or market UI is implemented. A new release still needs versioning and separate artifact qualification.
+
+
+## OpenClaw release compatibility
+
+The build SDK remains pinned to `2026.9.2`. Runtime compatibility starts at
+`2026.7.1`, including numeric repacks, and is exercised against every published
+stable release through npm `latest` on Linux and Windows. Named alpha/beta
+channels are not part of that promise. A matrix job builds the plugin first,
+selects the real host version, then checks adapter behavior, plugin activation, and a real Gateway/Studio
+run using a deterministic local model transport. Both Agent Loops execute native
+and CoNest tools, shared memory and generic component calls. Test reports identify the installed host and platform; a Linux
+result does not qualify native Windows execution.
+
+Version-specific code stays in `src/adapters/`. The older V1 harness contract
+and the scoped V2 contract share CoNest's execution path. The adapter translates
+prompt builders, terminal results, transcript persistence and Control UI
+surfaces; the current host retains its native implementations. Configuration
+readers follow runtime refreshes. An explicit empty tool allowlist always means
+no tools. Missing approval support returns unavailable, never approval.
+
+Older hosts do not expose finalized run-wide tool authority. CoNest retains
+call-scoped admission and configuration denials on those hosts: a directly
+admitted tool can call its own capability, while `bridge_invoke` cannot expose
+an otherwise filtered direct-tool alias. Use the named tool for those
+capabilities; independently installed component capabilities remain discoverable
+through the generic interface, but nested calls to direct-tool capabilities are
+subject to the same denials. Hosts without `plugins.list` report plugin inventory
+as unavailable; other errors remain visible. Authorized prompt-context injection requires the
+newer finalized-authority API and remains disabled when it is unavailable.
+
+Reproduce one matrix member after a clean bootstrap and frozen install:
+
+```bash
+pnpm build
+node scripts/maintenance/select-openclaw-version.mjs 2026.7.1
+CONEST_EXPECT_OPENCLAW_VERSION=2026.7.1 CONEST_REPORT_PROFILE=openclaw-2026.7.1 \
+  node scripts/test-openclaw-matrix.mjs
+```
+
+The selector restores `package.json` and leaves `pnpm-lock.yaml` unchanged.
+Run `pnpm install --frozen-lockfile` to restore the build SDK before compiling
+again. Runtime selection belongs in a disposable checkout with its own
+installation. The complete version list is produced by
+`node scripts/maintenance/openclaw-matrix.mjs`.

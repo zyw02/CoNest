@@ -31,7 +31,7 @@ CoNest 重点服务于：
 - **长时间运行的复杂操作** — 让编码、诊断、基础设施与人工决策在局部失败、取消、重试和转交中保持连续。
 - **跨设备与边缘执行** — 将敏感操作放在合适的工作站、服务器或设备上，同时让云端 Agent 继续规划与协作。
 
-CoNest 为不同 Agent SDK 定义统一的组件清单与运行协议。OpenClaw 和 DSH/Cordis 通过聚焦各自职责的适配层接入，[机器可读的兼容策略](compatibility.json)记录已验证版本。GitHub Actions 每日自动解析并测试 OpenClaw 与 DSH 的当前发行版，同时覆盖全部维护基线，让适配层持续跟随上游项目演进。
+CoNest 为不同 Agent SDK 定义统一的组件清单与运行协议。OpenClaw 和 DSH/Cordis 通过聚焦各自职责的适配层接入，[机器可读的兼容策略](compatibility.json)记录已验证版本。OpenClaw 兼容矩阵在 Linux 和 Windows 上逐一测试从 `2026.7.1` 到 npm `latest` 的全部正式发行版，包括数字修订版与 extended-stable 维护版本。每项任务先使用冻结 SDK 构建，再安装对应版本的宿主进行运行验证。DSH 覆盖全部已验证基线及当前上游版本；定时检查会自动纳入新发行版。
 
 > [!TIP]
 > **探索 0.6.4** — Gateway 与 CoNest Host 双进程、办公组件组合、共享记忆，以及通过 `--core` 启动的 OpenClaw + Core 专注体验。

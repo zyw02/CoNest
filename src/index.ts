@@ -1,6 +1,7 @@
 import {
   createRuntimeConfigReader,
   defineToolPlugin,
+  resolveControlUiSurface,
   isIncognitoSessionKey,
   type AnyAgentTool,
   type OpenClawPluginApi,
@@ -9,9 +10,8 @@ import {
 import { MEMORY_CAPABILITIES } from './memory-contract.js';
 import { createMemoryAccess } from './memory-adapter.js';
 import { Type } from 'typebox';
-import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, realpathSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inside, readConfig, resolveConfig } from './config.js';
@@ -23,14 +23,12 @@ import type { ManagedReadResult } from './read-contract.js';
 import { registerStudio } from './studio/index.js';
 import { ContextProvider, parseContextProvider, type ContextProviderConfig } from './context-provider.js';
 import { BridgeError, type BridgeConfig, type CapabilityDescriptor, type JsonObject, type Permission } from './types.js';
+import { openClawVersion } from './adapters/openclaw-version.js';
 import { inspectOpenClaw } from './compatibility.js';
 import { formatStatus, renderProgress, renderStatusPage, renderToolResult } from './ui.js';
 import { COMMAND_NAMES, CONNECTOR_FULL_NAME, CONNECTOR_NAME, PLUGIN_ID, STATUS_PATHS } from './branding.js';
 
-const require = createRequire(import.meta.url);
-const openClawEntry = require.resolve('openclaw/plugin-sdk/plugin-entry');
-const openClawManifest = JSON.parse(readFileSync(path.resolve(path.dirname(openClawEntry), '../../package.json'), 'utf8')) as { version?: unknown };
-export const openClawCompatibility = inspectOpenClaw(openClawManifest.version);
+export const openClawCompatibility = inspectOpenClaw(openClawVersion);
 
 const configSchema = Type.Object({
   studio: Type.Optional(Type.Object({ stateDir: Type.String({ minLength: 1 }) }, { additionalProperties: false })),
@@ -169,7 +167,7 @@ function createTool(
       const principal = binding.principal ?? hostPrincipal(toolContext);
       if (principal.kind !== 'agent') throw new BridgeError('INVALID_PRINCIPAL', 'Host tools require an agent principal');
       const capabilityCeiling = configuredHostCeiling(toolContext.getRuntimeConfig?.() ?? toolContext.runtimeConfig ?? toolContext.config ?? api.config, principal.agentId, toolContext.activeModel);
-      capabilityCeiling.deny = [...new Set([...capabilityCeiling.deny ?? [], ...state.scopes.runDenials(binding.runId), 'memory_recall', 'memory_remember', ...(incognito ? MEMORY_CAPABILITIES : [])])];
+      capabilityCeiling.deny = [...new Set([...capabilityCeiling.deny ?? [], ...state.scopes.runDenials(binding.runId, binding.capabilityDenials), 'memory_recall', 'memory_remember', ...(incognito ? MEMORY_CAPABILITIES : [])])];
       if (name === 'bridge_capabilities') {
         const catalog = await state.host.catalog({ principal, permissions, capabilityCeiling });
         binding.signal.throwIfAborted();
@@ -288,7 +286,7 @@ function registerRuntime(api: OpenClawPluginApi, state: PluginState): void {
     },
   });
   api.session.controls.registerControlUiDescriptor({
-    surface: 'tab', id: PLUGIN_ID, label: CONNECTOR_NAME,
+    surface: resolveControlUiSurface(), id: PLUGIN_ID, label: CONNECTOR_NAME,
     description: 'Inspect component health, task load, and available capabilities.',
     path: STATUS_PATHS[0], icon: 'plug', group: 'agent', order: 30,
     requiredScopes: ['operator.read'],

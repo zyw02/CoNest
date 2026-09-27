@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHostAgentsConfig } from '../dist/adapters/openclaw-version.js';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -63,7 +64,7 @@ const model=createServer(async(req,res)=>{try{
 await new Promise(resolve=>model.listen(0,'127.0.0.1',resolve));const modelPort=model.address().port;
 const port=Number(process.env.CONEST_DEMO_PORT??18791);
 const config={logging:{file:path.join(demoRoot,'gateway.log')},gateway:{mode:'local',bind:'loopback',port,auth:{mode:'token',token},controlUi:{enabled:true,allowedOrigins:[`http://127.0.0.1:${port}`,`http://localhost:${port}`]}},
- agents:{ownership:'explicit',defaults:{workspace,skipBootstrap:true,model:{primary:'deepseek/deepseek-v4-flash'},models:{'deepseek/deepseek-v4-flash':{agentRuntime:{id:coreOnly?'openclaw':'dsh'}}},thinkingDefault:'off'},entries:{main:{workspace}}},
+ agents:createHostAgentsConfig({defaults:{workspace,skipBootstrap:true,model:{primary:'deepseek/deepseek-v4-flash'},models:{'deepseek/deepseek-v4-flash':{agentRuntime:{id:coreOnly?'openclaw':'dsh'}}},thinkingDefault:'off'},entries:{main:{workspace}}}),
  tools:{allow:['read','session_status','dsh_read','dsh_grep','dsh_glob','dsh_mcp__reference_memory__search_nodes','bridge_capabilities','bridge_invoke','knowledge_search','knowledge_verify'],fs:{workspaceOnly:true},codeMode:{enabled:false}},
  models:{mode:'replace',providers:{deepseek:{baseUrl:`http://127.0.0.1:${modelPort}/v1`,api:'openai-completions',apiKey:'local-transport-only',models:[{id:'deepseek-v4-flash',name:live?'DeepSeek Flash · live':'CoNest · deterministic rehearsal',agentRuntime:{id:coreOnly?'openclaw':'dsh'},reasoning:false,input:['text'],contextWindow:128000,maxTokens:2048,cost:{input:0,output:0,cacheRead:0,cacheWrite:0}}]}}},
  plugins:{enabled:true,allow:['dsh-bridge','deepseek'],slots:{memory:'none'},load:{paths:[process.env.CONEST_PLUGIN_ROOT??root,providerDir]},entries:{deepseek:{enabled:true},'dsh-bridge':{enabled:true,hooks:{allowConversationAccess:true},config:{workspaceRoot:workspace,configFile:componentConfig,capabilityGuidance:true,contextProvider:{capability:'office_context',provider:'office-context',timeoutMs:2000,maxChars:1000},studio:{stateDir:studio,dsh:!coreOnly,demoMode:live?'live':'fixture'}}}}}};
@@ -87,7 +88,7 @@ try{
  await writeFile(path.join(demoRoot,'connection.json'),JSON.stringify({url:base,token,mode:live?'live':'fixture',pid:process.pid},null,2),{mode:0o600});
  console.log(JSON.stringify({ready:state?.status,url:base,connectionFile:path.join(demoRoot,'connection.json'),catalog:state?.items?.length,errors:state?.errors,model:live?'live':'fixture'}));
  if(verify){
-  assert.equal(state.status,'ready');assert.equal(state.errors.length,0);assert.ok(state.items.some(i=>i.origin==='openclaw'&&i.kind==='plugin'));if(!coreOnly)assert.ok(state.items.some(i=>i.name==='dsh_grep'));assert.notEqual(state.process.gatewayPid,state.process.hostPid);assert.equal(state.components.pid,state.process.hostPid);
+  assert.equal(state.status,'ready');assert.equal(state.errors.length,0);if(state.pluginInventoryAvailable)assert.ok(state.items.some(i=>i.origin==='openclaw'&&i.kind==='plugin'));if(!coreOnly)assert.ok(state.items.some(i=>i.name==='dsh_grep'));assert.notEqual(state.process.gatewayPid,state.process.hostPid);assert.equal(state.components.pid,state.process.hostPid);
   const completed=[];
   const scenarios=coreOnly?[]:[['dsh','使用 OpenClaw 的 read 读取 evidence.txt，再用 DSH 的 dsh_grep 搜索 CoNest，汇总两次工具返回的真实内容。'],['dsh','请记住：CoNest 演示的项目代号是青竹，汇报偏好为先结论、后证据。请确认记忆。'],['openclaw','刚才记住的 CoNest 项目代号和汇报偏好是什么？请根据共享记忆回答。'],['openclaw','使用 OpenClaw 的 read 读取 evidence.txt，再用 DSH 的 dsh_grep 搜索 CoNest，汇总两次工具返回的真实内容。']];
   scenarios.push(['openclaw','检查这份采购申请：没有附件。使用 office_check 并返回检查依据。']);

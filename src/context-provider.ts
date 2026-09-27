@@ -101,7 +101,7 @@ export class ContextProvider {
         return { principal, permissions: ['workspace:read'], capabilityCeiling };
       };
       const request = check();
-      scopes.observe(callId, context.runId, controller.signal, request.principal, context);
+      scopes.observe(callId, { runId: context.runId, signal: controller.signal, principal: request.principal, session: context });
       bound = true;
       const binding = scopes.claim(callId);
       // Run-end and service cleanup abort through the shared call scopes.

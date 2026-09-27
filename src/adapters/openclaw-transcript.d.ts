@@ -8,8 +8,14 @@ declare module 'openclaw/plugin-sdk/session-transcript-runtime' {
     config?: unknown; cwd?: string; eventId: string; idempotencyLookup: 'scan'; message: T;
     prepareMessageAfterIdempotencyCheck: () => T | undefined;
   }): Promise<{ kind: 'rejected' } | { kind: 'suppressed' } | {
-    kind: 'appended'; result: { appended: boolean; anchor: TranscriptEntryAnchor };
+    kind: 'result'; result: { appended: boolean; anchor: TranscriptEntryAnchor };
   }>;
+  export function appendSessionTranscriptMessageByIdentity<T>(params: {
+    agentId?: string; sessionId: string; sessionKey: string; storePath: string;
+    config?: unknown; cwd?: string; idempotencyLookup?: 'scan'; message: T;
+    prepareMessageAfterIdempotencyCheck?: () => T | undefined;
+  }): Promise<{ appended: boolean; messageId?: string } | undefined>;
+  export function readSessionTranscriptEvents(params: { agentId?: string; sessionId: string; sessionKey: string; storePath: string }): Promise<unknown[]>;
   export function publishSessionTranscriptUpdateByIdentity(params: {
     agentId?: string; sessionId: string; sessionKey: string; storePath: string;
   }): Promise<unknown>;

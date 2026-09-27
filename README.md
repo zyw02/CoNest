@@ -31,7 +31,7 @@ CoNest is being built for:
 - **Long-running operations** — coordinate coding, diagnosis, infrastructure and human decisions across partial failure, cancellation, retry and handoff.
 - **Cross-device and edge execution** — place sensitive work on the right workstation, server or device while cloud Agents continue to plan and collaborate.
 
-CoNest defines a common component manifest and runtime protocol across Agent SDKs. OpenClaw and DSH/Cordis connect through focused adapters, while the machine-readable [compatibility policy](compatibility.json) records qualified versions. A daily GitHub Actions watch resolves and tests the current OpenClaw and DSH releases alongside every maintained baseline, keeping the adapters current as upstream projects evolve.
+CoNest defines a common component manifest and runtime protocol across Agent SDKs. OpenClaw and DSH/Cordis connect through focused adapters, while the machine-readable [compatibility policy](compatibility.json) records qualified versions. The OpenClaw matrix resolves every stable release from `2026.7.1` through npm `latest`, including numeric repacks and extended-stable maintenance releases, and runs on Linux and Windows. Each job builds against the frozen SDK before installing the selected runtime host. DSH is tested against every qualified baseline and the current upstream release. Scheduled checks discover newly published releases automatically.
 
 > [!TIP]
 > **Explore 0.6.4** — Gateway + CoNest Host, composable office services, shared memory, and a focused OpenClaw + Core experience via `--core`.

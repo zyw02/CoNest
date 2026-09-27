@@ -1,3 +1,4 @@
+import { createHostAgentsConfig } from './adapters/openclaw-version.js';
 import { Ajv } from 'ajv';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { parseEnv, promisify } from 'node:util';
 import { controlRequest, serveControl } from './control.js';
 import { executionEnvironment } from './environment.js';
-import { assertRuntime, assertPrivateFile, protectDirectory, stopProcessTree } from './platform-support.mjs';
+import { assertRuntime, assertPrivateFile, assertPrivateDirectory, protectDirectory, stopProcessTree } from './platform-support.mjs';
 import { BridgeError, HOST_VERSION, BRIDGE_VERSION, type CapabilityCatalog, type RuntimeStatus } from './types.js';
 import { inspectOpenClaw, OPENCLAW_COMPATIBILITY_RANGE } from './compatibility.js';
 
@@ -37,7 +38,13 @@ function contained(parent: string, child: string): boolean {
 }
 
 async function privateFile(file: string): Promise<void> {
-  if (process.platform === 'win32') { await assertPrivateFile(file); return; }
+  if (process.platform === 'win32') {
+    try { await assertPrivateFile(file); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw error;
+      throw new BridgeError('LOCAL_FILE_UNSAFE', 'Local configuration and credentials require a regular file with a private Windows ACL');
+    }
+    return;
+  }
   const stat = await lstat(file);
   if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) {
     throw new BridgeError('LOCAL_FILE_UNSAFE', 'Local configuration and credential files must be regular, current-user-owned files with mode 600 or 400');
@@ -105,10 +112,10 @@ export async function setupLocal(directory: string, options: { workspace: string
   const config = {
     gateway: { mode: 'local', bind: 'loopback', port, auth: { mode: 'token', token: '${OPENCLAW_GATEWAY_TOKEN}' }, controlUi: { enabled: false } },
     logging: { file: path.join(target, 'gateway.log'), maxFileBytes: 1_048_576, level: 'info' },
-    agents: { ownership: 'explicit', defaults: { workspace: workspaceRoot, skipBootstrap: true,
+    agents: createHostAgentsConfig({ defaults: { workspace: workspaceRoot, skipBootstrap: true,
       model: { primary: model, fallbacks: [] }, thinkingDefault: 'off', timeoutSeconds: settings.timeoutSeconds, maxConcurrent: 1,
       heartbeat: { every: '0m' }, models: { [model]: { params: { maxTokens: settings.maxOutputTokens } } } },
-      entries: { main: { workspace: workspaceRoot } } },
+      entries: { main: { workspace: workspaceRoot } } }),
     tools: { allow: ['read', 'session_status', 'knowledge_search', 'knowledge_verify', 'bridge_capabilities', 'bridge_invoke'],
       codeMode: { enabled: false }, fs: { workspaceOnly: true }, loopDetection: { enabled: true } },
     models: { mode: 'replace', providers: { deepseek: {
@@ -145,6 +152,9 @@ function profilePaths(directory: string, settings: LocalSettings): LocalProfile 
 export async function readLocal(directory: string): Promise<LocalProfile> {
   assertPlatform();
   const supplied = path.resolve(directory);
+  if (process.platform === 'win32') {
+    try { await assertPrivateDirectory(supplied); } catch { throw new BridgeError('LOCAL_DIRECTORY_UNSAFE', 'Local state requires a regular directory with a private Windows ACL'); }
+  }
   const stat = await lstat(supplied);
   if (!stat.isDirectory() || stat.isSymbolicLink() || (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()))) {
     throw new BridgeError('LOCAL_DIRECTORY_UNSAFE', 'The local state directory must be current-user-owned, non-symlink, and mode 700');
@@ -184,7 +194,7 @@ export async function validateLocalBoundary(profile: LocalProfile): Promise<void
   const provider = host.models?.providers?.deepseek;
   const settings = profile.settings;
   if (bridge.workspaceRoot !== settings.workspaceRoot || host.agents?.defaults?.workspace !== settings.workspaceRoot ||
-      Object.values(host.agents?.entries ?? {}).some(entry => (entry as { workspace?: unknown }).workspace !== settings.workspaceRoot) ||
+      [...Object.values(host.agents?.entries ?? {}), ...(host.agents?.list ?? [])].some(entry => (entry as { workspace?: unknown }).workspace !== settings.workspaceRoot) ||
       Object.keys(host.models?.providers ?? {}).join(',') !== 'deepseek' || provider?.baseUrl !== 'https://api.deepseek.com' ||
       provider.apiKey !== '${DEEPSEEK_API_KEY}' || provider.agentRuntime?.id !== 'openclaw' ||
       host.gateway?.bind !== 'loopback' || host.gateway?.port !== settings.port ||

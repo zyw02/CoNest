@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { protectDirectory } from '../src/platform-support.mjs';
+import { setTestPermissions } from './file-permissions.js';
 import { executionEnvironment } from '../src/environment.js';
 import { readLocal, setupLocal, statusLocal, stopLocal, validateLocalBoundary } from '../src/local.js';
 
 async function fixture(t: test.TestContext) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'bridge-local-test-'));
   t.after(() => rm(root, { recursive: true, force: true }));
+  await protectDirectory(root);
   const workspace = path.join(root, 'workspace');
   const credentials = path.join(root, 'deepseek.env');
   const state = path.join(root, 'profile');
@@ -21,7 +24,7 @@ test('local setup creates a private direct-provider profile without copying cred
   const f = await fixture(t);
   const profile = await setupLocal(f.state, f);
   const loaded = await readLocal(f.state);
-  assert.equal(loaded.settings.workspaceRoot, f.workspace);
+  assert.equal(loaded.settings.workspaceRoot, await realpath(f.workspace));
   assert.equal(loaded.settings.port, profile.settings.port);
   const host = JSON.parse(await readFile(profile.gatewayFile, 'utf8'));
   assert.equal(host.models.providers.deepseek.baseUrl, 'https://api.deepseek.com');
@@ -31,6 +34,7 @@ test('local setup creates a private direct-provider profile without copying cred
   assert.deepEqual(host.agents.defaults.model.fallbacks, []);
   assert.equal(host.plugins.entries['dsh-bridge'].hooks.allowConversationAccess, true);
   assert.ok(!JSON.stringify(host).includes('test-only-not-a-real-key'));
+  await validateLocalBoundary(profile);
   const original = await readFile(profile.file, 'utf8');
   await assert.rejects(setupLocal(f.state, f), { code: 'EEXIST' });
   assert.equal(await readFile(profile.file, 'utf8'), original);
@@ -40,9 +44,9 @@ test('local setup creates a private direct-provider profile without copying cred
 
 test('local setup rejects searchable credentials, overlapping state, symlinks, and unsafe file permissions', async t => {
   const f = await fixture(t);
-  await chmod(f.credentials, 0o644);
+  await setTestPermissions(f.credentials, 0o644);
   await assert.rejects(setupLocal(f.state, f), { code: 'LOCAL_FILE_UNSAFE' });
-  await chmod(f.credentials, 0o600);
+  await setTestPermissions(f.credentials, 0o600);
   const linked = path.join(f.root, 'linked.env');
   await symlink(f.credentials, linked);
   await assert.rejects(setupLocal(f.state, { ...f, credentials: linked }), { code: 'LOCAL_FILE_UNSAFE' });
@@ -59,10 +63,10 @@ test('local configuration parsing fails closed on changed layout and unknown fie
   await writeFile(profile.file, JSON.stringify({ ...profile.settings, unknown: true }));
   await assert.rejects(readLocal(f.state), { code: 'LOCAL_CONFIG_INVALID' });
   await writeFile(profile.file, JSON.stringify(profile.settings));
-  await chmod(f.state, 0o755);
+  await setTestPermissions(f.state, 0o755);
   await assert.rejects(readLocal(f.state), { code: 'LOCAL_DIRECTORY_UNSAFE' });
-  await chmod(f.state, 0o700);
-  await chmod(profile.gatewayFile, 0o644);
+  await setTestPermissions(f.state, 0o700);
+  await setTestPermissions(profile.gatewayFile, 0o644);
   await assert.rejects(readLocal(f.state), { code: 'LOCAL_FILE_UNSAFE' });
 });
 

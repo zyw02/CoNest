@@ -3,7 +3,8 @@ import test from 'node:test';
 import {mkdir, mkdtemp, writeFile, rm, symlink} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {assertRuntime, assertPrivateFile, protectDirectory} from '../src/platform-support.mjs';
+import {assertRuntime, assertPrivateFile, assertPrivateDirectory, protectDirectory} from '../src/platform-support.mjs';
+import { setTestPermissions } from './file-permissions.js';
 import {executionEnvironment} from '../src/environment.js';
 
 test('platform admission accepts the RHEL 8 baseline and Windows x64 and rejects incompatible runtimes', () => {
@@ -22,4 +23,22 @@ test('private credentials remain protected and indirect credential files are rej
   const dir=path.join(root,'private');await protectDirectory(dir);const file=path.join(dir,'key.env');await writeFile(file,'DEEPSEEK_API_KEY=synthetic-test-only\n',{mode:0o600});await assertPrivateFile(file);
   // Windows symlink creation depends on host privileges; the native CI still verifies ACLs above.
   if(process.platform!=='win32'){const link=path.join(dir,'linked.env');await symlink(file,link);await assert.rejects(assertPrivateFile(link),/regular file/);}
+});
+
+
+test('private state rejects broadened directory and file permissions on the executing platform', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'conest-acl-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const directory = path.join(root, 'state');
+  await protectDirectory(directory);
+  const file = path.join(directory, 'credentials.env');
+  await writeFile(file, 'synthetic fixture', { mode: 0o600 });
+  await assertPrivateDirectory(directory);
+  await assertPrivateFile(file);
+  await setTestPermissions(directory, 0o755);
+  await assert.rejects(assertPrivateDirectory(directory));
+  await setTestPermissions(directory, 0o700);
+  await assertPrivateDirectory(directory);
+  await setTestPermissions(file, 0o644);
+  await assert.rejects(assertPrivateFile(file), /owner-only/);
 });

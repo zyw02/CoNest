@@ -114,9 +114,6 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: file:.vendor/dsh/packages/core/tools
         version: file:.vendor/dsh/packages/core/tools(27ff86909df316bd57cf477599d6ed2e)
-      '@deepseek-ai/node-addon-landlock-run-linux-x64':
-        specifier: 0.1.1
-        version: 0.1.1
       '@deepseek-ai/node-addon-system':
         specifier: 0.1.2
         version: 0.1.2
@@ -319,6 +316,10 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
+    optionalDependencies:
+      '@deepseek-ai/node-addon-landlock-run-linux-x64':
+        specifier: 0.1.1
+        version: 0.1.1
 
 packages:
 
@@ -4216,7 +4217,8 @@ snapshots:
   '@deepseek-ai/node-addon-landlock-run-linux-arm64@0.1.1':
     optional: true
 
-  '@deepseek-ai/node-addon-landlock-run-linux-x64@0.1.1': {}
+  '@deepseek-ai/node-addon-landlock-run-linux-x64@0.1.1':
+    optional: true
 
   '@deepseek-ai/node-addon-landlock-run@0.1.1':
     optionalDependencies:

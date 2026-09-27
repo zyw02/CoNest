@@ -100,7 +100,7 @@ async function filesIn(directory, base = '') {
 try {
   assert.ok(nativeRoot, 'Supply --native-dir with verified target assets; host-built binaries are not a portable release');
   const rootManifest = await readJson(path.join(source, 'package.json'));
-  await collect(source, { name: rootManifest.name, dependencies: rootManifest.dependencies });
+  await collect(source, { name: rootManifest.name, dependencies: rootManifest.dependencies, optionalDependencies: rootManifest.optionalDependencies });
   await mkdir(stage);
   const topFiles = [
     "dist",

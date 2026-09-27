@@ -1,4 +1,5 @@
 import type { OpenClawPluginApi } from './adapters/openclaw-sdk.js';
+import { openClawContract } from './adapters/openclaw-version.js';
 import { DIRECT_CAPABILITY_NAMES } from './managed-tools.js';
 import { hostPrincipal } from './host-policy.js';
 import type { RunScopes } from './run-scope.js';
@@ -47,8 +48,18 @@ export function registerHostAdapter(api: OpenClawPluginApi, scopes: RunScopes, o
   api.on('before_tool_call', (event, context) => {
     if (!HOST_TOOL_NAMES.includes(event.toolName as HostToolName)) return;
     const callId = context.toolCallId ?? event.toolCallId;
-    if (callId) scopes.observe(scopedCallId(context, callId), context.runId ?? event.runId, context.abortSignal,
-      context.agentId ? hostPrincipal({ agentId: context.agentId, messageChannel: context.requester?.channel, agentAccountId: context.requester?.accountId, requesterSenderId: context.requester?.senderId }) : undefined, context);
+    if (callId) scopes.observe(scopedCallId(context, callId), {
+      runId: context.runId ?? event.runId,
+      signal: context.abortSignal,
+      principal: context.agentId ? hostPrincipal({ agentId: context.agentId,
+        messageChannel: context.requester?.channel, agentAccountId: context.requester?.accountId,
+        requesterSenderId: context.requester?.senderId }) : undefined,
+      session: context,
+      // V1 provides call admission, but cannot attest the other direct tools.
+      // These negative restrictions also apply to nested component calls.
+      capabilityDenials: openClawContract === 'legacy-v1'
+        ? DIRECT_CAPABILITY_NAMES.filter(name => name !== event.toolName) : undefined,
+    });
   });
   api.on('after_tool_call', (event, context) => {
     if (!HOST_TOOL_NAMES.includes(event.toolName as HostToolName)) return;

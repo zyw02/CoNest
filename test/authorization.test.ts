@@ -75,18 +75,18 @@ test('TTL stops real pending work and cancellation cannot use another call grant
 test('host run end and caller abort invalidate retained execution bindings', () => {
   const scopes = new RunScopes(5_000, 8);
   try {
-    scopes.observe('call-one', 'run-one');
+    scopes.observe('call-one', { runId: 'run-one' });
     const binding = scopes.claim('call-one');
     scopes.endRun('run-one');
     assert.equal(binding.signal.aborted, true);
     assert.throws(() => scopes.claim('call-one'), hasCode('TASK_ENDED'));
     const abort = new AbortController();
-    scopes.observe('call-two', 'run-two', abort.signal);
+    scopes.observe('call-two', { runId: 'run-two', signal: abort.signal });
     const second = scopes.claim('call-two');
     abort.abort(new Error('Host cancellation'));
     assert.equal(second.signal.aborted, true);
     assert.throws(() => scopes.claim('call-two'), /Host cancellation/);
-    scopes.observe('call-three', 'run-three');
+    scopes.observe('call-three', { runId: 'run-three' });
     scopes.claim('call-three');
     assert.throws(() => scopes.claim('call-three'), hasCode('CALL_ALREADY_USED'));
   } finally { scopes.close(); }

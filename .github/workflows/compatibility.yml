@@ -5,10 +5,10 @@ on:
     - cron: '17 2 * * *'
   push:
     branches: [main, develop]
-    paths: [compatibility.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, 'src/adapters/**', 'src/compatibility.ts', 'src/dsh-search-component.ts', 'src/studio/**', 'scripts/build-studio.mjs', 'test/compatibility.test.ts', 'test/select-dsh-version.test.mjs', 'scripts/maintenance/select-dsh-version.mjs', '.github/workflows/compatibility.yml']
+    paths: [compatibility.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, 'src/**', 'test/**', 'scripts/**', '.github/workflows/compatibility.yml']
   pull_request:
     branches: [main, develop]
-    paths: [compatibility.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, 'src/adapters/**', 'src/compatibility.ts', 'src/dsh-search-component.ts', 'src/studio/**', 'scripts/build-studio.mjs', 'test/compatibility.test.ts', 'test/select-dsh-version.test.mjs', 'scripts/maintenance/select-dsh-version.mjs', '.github/workflows/compatibility.yml']
+    paths: [compatibility.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, 'src/**', 'test/**', 'scripts/**', '.github/workflows/compatibility.yml']
   workflow_dispatch:
 
 permissions:
@@ -20,20 +20,25 @@ jobs:
     outputs:
       matrix: ${{ steps.resolve.outputs.matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
       - id: resolve
-        name: Resolve baseline and current OpenClaw releases
-        shell: bash
-        run: |
-          latest="$(npm view openclaw version --json)"
-          matrix="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(JSON.stringify([...new Set(["2026.9.2",v])]))' "$latest")"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+        name: Resolve every stable OpenClaw release since 2026.7.1
+        run: echo "matrix=$(node scripts/maintenance/openclaw-matrix.mjs)" >> "$GITHUB_OUTPUT"
   openclaw:
+    name: OpenClaw ${{ matrix.version }} / ${{ matrix.os }}
     needs: openclaw-versions
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
         version: ${{ fromJSON(needs.openclaw-versions.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -46,11 +51,22 @@ jobs:
       - name: Restore verified DSH adapter SDK
         run: node scripts/maintenance/bootstrap.mjs
       - run: pnpm install --frozen-lockfile
-      - name: Select OpenClaw ${{ matrix.version }} without changing repository locks
-        run: pnpm add --save-dev --ignore-workspace-root-check --lockfile=false "openclaw@${{ matrix.version }}"
-      - run: pnpm build
-      - run: pnpm exec tsx --test test/compatibility.test.ts test/host-adapter.test.ts
-      - run: node scripts/test-openclaw.mjs
+      - name: Build once against the frozen SDK
+        run: pnpm build
+      - name: Select the actual runtime host without changing build pins
+        run: node scripts/maintenance/select-openclaw-version.mjs "${{ matrix.version }}"
+      - name: Verify adapters, activation and real Gateway execution
+        env:
+          CONEST_EXPECT_OPENCLAW_VERSION: ${{ matrix.version }}
+          CONEST_REPORT_PROFILE: openclaw-${{ matrix.version }}
+        run: node scripts/test-openclaw-matrix.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: openclaw-${{ matrix.version }}-${{ matrix.os }}
+          path: .local/reports/openclaw-${{ matrix.version }}/
+          include-hidden-files: true
+          if-no-files-found: error
   dsh-versions:
     runs-on: ubuntu-24.04
     outputs:

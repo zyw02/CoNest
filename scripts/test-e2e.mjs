@@ -1,3 +1,4 @@
+import { createHostAgentsConfig } from '../dist/adapters/openclaw-version.js';
 import { memoryProbeDecision, qualifyManagedMemory } from './qualify-memory.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -206,8 +207,8 @@ try {
   const config = {
     logging: { file: path.join(root, 'gateway.log') },
     gateway: { mode: 'local', bind: 'loopback', port, auth: { mode: 'token', token }, controlUi: { enabled: false } },
-    agents: { ownership: 'explicit', defaults: { workspace, skipBootstrap: true, model: { primary: live ? 'bridge-live/deepseek-v4-flash' : 'bridge-fixture/deterministic' } },
-      entries: { main: { workspace }, ...(memoryMigration ? { nomemorytool: { workspace, tools: { deny: ['dsh_mcp__reference_memory__search_nodes'] } } } : {}), ...(readMigration ? { noreadtool: { workspace, tools: { deny: ['dsh_read'] } } } : {}), ...(searchMigration ? { nosearchtools: { workspace, tools: { deny: ['dsh_grep', 'dsh_glob'] } } } : {}), restricted: { workspace, tools: { deny: ['bridge_invoke'] } }, nosearch: { workspace, tools: { deny: ['knowledge_search'] } }, limited: { workspace } } },
+    agents: createHostAgentsConfig({ defaults: { workspace, skipBootstrap: true, model: { primary: live ? 'bridge-live/deepseek-v4-flash' : 'bridge-fixture/deterministic' } },
+      entries: { main: { workspace }, ...(memoryMigration ? { nomemorytool: { workspace, tools: { deny: ['dsh_mcp__reference_memory__search_nodes'] } } } : {}), ...(readMigration ? { noreadtool: { workspace, tools: { deny: ['dsh_read'] } } } : {}), ...(searchMigration ? { nosearchtools: { workspace, tools: { deny: ['dsh_grep', 'dsh_glob'] } } } : {}), restricted: { workspace, tools: { deny: ['bridge_invoke'] } }, nosearch: { workspace, tools: { deny: ['knowledge_search'] } }, limited: { workspace } } }),
     tools: { allow: ['read', 'session_status', 'knowledge_search', 'bridge_capabilities', 'bridge_invoke', ...memoryMigration ? ['dsh_mcp__reference_memory__create_entities', 'dsh_mcp__reference_memory__search_nodes', 'dsh_mcp__reference_memory__read_graph'] : [], ...searchMigration ? ['dsh_grep', 'dsh_glob'] : [], ...readMigration ? ['dsh_read', 'dsh_edit', 'dsh_write'] : []], codeMode: { enabled: false } },
     models: { mode: 'replace', providers: { [live ? 'bridge-live' : 'bridge-fixture']: {
       baseUrl: `http://127.0.0.1:${modelPort}/v1`, api: 'openai-completions', apiKey: 'local-fixture-only',

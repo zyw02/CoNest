@@ -15,7 +15,8 @@ export function hostPrincipal(context: IdentityContext): Principal {
 export function configuredHostCeiling(config: unknown, agentId: string, model?: { provider?: string; modelId?: string }): CapabilityRule {
   const root = object(config);
   const agents = object(root.agents);
-  const agent = object(object(agents.entries)[agentId]);
+  const legacyAgents = Array.isArray(agents.list) ? agents.list : [];
+  const agent = object(object(agents.entries)[agentId] ?? legacyAgents.find(entry => object(entry).id === agentId));
   const policies = [object(root.tools), object(agent.tools)];
   const deny = new Set<string>();
   for (const policy of [...policies]) {

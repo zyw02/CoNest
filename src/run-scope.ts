@@ -1,7 +1,15 @@
 import { BridgeError, type Principal } from './types.js';
 
 export type HostSession = { sessionId?: string; agentId?: string };
-type Binding = { runId?: string; principal?: Principal; session: HostSession; controller: AbortController; timer: NodeJS.Timeout; consumed: boolean };
+type ObservedCall = {
+  runId?: string;
+  signal?: AbortSignal;
+  principal?: Principal;
+  session?: HostSession;
+  capabilityDenials?: readonly string[];
+};
+
+type Binding = { runId?: string; principal?: Principal; session: HostSession; controller: AbortController; timer: NodeJS.Timeout; consumed: boolean; capabilityDenials?: readonly string[] };
 
 /** Bind adapter calls to host lifecycle events without exposing authority in model arguments. */
 export class RunScopes {
@@ -10,9 +18,13 @@ export class RunScopes {
 
   constructor(private readonly lifetimeMs: number, private readonly limit: number) {}
 
-  observe(callId: string, runId?: string, signal?: AbortSignal, principal?: Principal, session: HostSession = {}): void {
+  observe(callId: string, { runId, signal, principal, session = {}, capabilityDenials }: ObservedCall = {}): void {
     const existing = this.calls.get(callId);
-    if (existing) { existing.session = mergeSession(existing.session, session); return; }
+    if (existing) {
+      existing.session = mergeSession(existing.session, session);
+      if (capabilityDenials) existing.capabilityDenials = [...new Set([...existing.capabilityDenials ?? [], ...capabilityDenials])];
+      return;
+    }
     if (this.calls.size >= this.limit) throw new BridgeError('TOO_MANY_TASKS', 'The adapter task binding limit has been reached');
     const controller = new AbortController();
     const abort = () => controller.abort(signal?.reason ?? new BridgeError('TASK_CANCELLED', 'The host cancelled the call'));
@@ -25,16 +37,16 @@ export class RunScopes {
     }, this.lifetimeMs);
     timer.unref();
     controller.signal.addEventListener('abort', () => signal?.removeEventListener('abort', abort), { once: true });
-    this.calls.set(callId, { runId, principal: principal ? structuredClone(principal) : undefined, session: mergeSession({}, session), controller, timer, consumed: false });
+    this.calls.set(callId, { runId, principal: principal ? structuredClone(principal) : undefined, session: mergeSession({}, session), controller, timer, consumed: false, capabilityDenials: capabilityDenials ? [...capabilityDenials] : undefined });
   }
 
-  claim(callId: string, signal?: AbortSignal, session?: HostSession): { runId?: string; principal?: Principal; signal: AbortSignal } {
-    this.observe(callId, undefined, signal, undefined, session);
+  claim(callId: string, signal?: AbortSignal, session?: HostSession): { runId?: string; principal?: Principal; signal: AbortSignal; capabilityDenials?: readonly string[] } {
+    this.observe(callId, { signal, session });
     const binding = this.calls.get(callId)!;
     binding.controller.signal.throwIfAborted();
     if (binding.consumed) throw new BridgeError('CALL_ALREADY_USED', 'This host call has already consumed its execution authority');
     binding.consumed = true;
-    return { runId: binding.runId, principal: binding.principal, signal: signal ? AbortSignal.any([signal, binding.controller.signal]) : binding.controller.signal };
+    return { runId: binding.runId, principal: binding.principal, capabilityDenials: binding.capabilityDenials, signal: signal ? AbortSignal.any([signal, binding.controller.signal]) : binding.controller.signal };
   }
 
   restrictRun(runId: string, denied: string[], session: HostSession = {}): void {
@@ -50,11 +62,11 @@ export class RunScopes {
     for (const name of denied) record.deny.add(name);
   }
 
-  runDenials(runId?: string): string[] {
-    if (!runId) return [];
+  runDenials(runId?: string, callDenials?: readonly string[]): string[] {
+    if (!runId) return [...callDenials ?? []];
     const record = this.restrictions.get(runId);
-    if (!record) throw new BridgeError('HOST_POLICY_UNAVAILABLE', 'The owning run has no current finalized tool-policy snapshot; enable the plugin conversation hook permission and start a new supported OpenClaw run');
-    return [...record.deny];
+    if (!record && !callDenials) throw new BridgeError('HOST_POLICY_UNAVAILABLE', 'The owning run has no current finalized tool-policy snapshot; enable the plugin conversation hook permission and start a new supported OpenClaw run');
+    return [...new Set([...record?.deny ?? [], ...callDenials ?? []])];
   }
 
   endCall(callId: string): void {

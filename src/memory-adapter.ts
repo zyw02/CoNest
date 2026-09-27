@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { isIncognitoSessionKey } from './adapters/openclaw-sdk.js';
+import { isIncognitoSessionKey } from './adapters/openclaw-config.js';
 import { configuredHostCeiling, hostPrincipal } from './host-policy.js';
 import { BridgeError, type BridgeConfig, type JsonObject } from './types.js';
 import type { ClientInvocation } from './client.js';

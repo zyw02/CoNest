@@ -18,6 +18,9 @@ test('accepts supported OpenClaw releases without requiring the build pin', () =
     name: 'OpenClaw', installed: '2026.9.2', supported: OPENCLAW_COMPATIBILITY_RANGE, tested: true,
   });
   assert.equal(inspectOpenClaw('2026.9.5').tested, true);
+  for (const version of ['2026.7.1', '2026.7.1-1', '2026.7.1-2', '2026.7.35', '2026.8.1']) assert.equal(inspectOpenClaw(version).installed, version);
+  assert.throws(() => inspectOpenClaw('2026.6.1'), /outside/);
+  assert.throws(() => inspectOpenClaw('2026.7.1-beta.6'), /prerelease/);
   assert.equal(inspectOpenClaw('2026.10.0').tested, false);
   assert.throws(() => inspectOpenClaw('2027.1.0'), /outside CoNest's supported range/);
 });
@@ -37,6 +40,7 @@ test('keeps published compatibility metadata aligned with package discovery meta
   assert.equal(compatibility.adapters.openclaw.supported, OPENCLAW_COMPATIBILITY_RANGE);
   assert.equal(pkg.peerDependencies.openclaw, OPENCLAW_COMPATIBILITY_RANGE);
   assert.equal(pkg.openclaw.compat.pluginApi, OPENCLAW_COMPATIBILITY_RANGE);
+  assert.equal(pkg.openclaw.compat.minGatewayVersion, `${compatibility.adapters.openclaw.minimum}-0`);
   assert.equal(compatibility.adapters.dsh.supported, DSH_COMPATIBILITY_RANGE);
   assert.deepEqual(compatibility.adapters.dsh.tested, [...DSH_TESTED_VERSIONS]);
   assert.deepEqual(compatibility.adapters.dsh.qualifications.map((entry: { version: string }) => entry.version), [...DSH_TESTED_VERSIONS]);
@@ -51,7 +55,7 @@ test('keeps third-party Agent SDK imports inside adapter modules', async () => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const file = path.join(directory, entry.name);
       if (entry.isDirectory()) queue.push(file);
-      else if (!file.startsWith('src/adapters/') && /\.(?:[cm]?ts|[cm]?js)$/.test(file)) {
+      else if (!file.split(path.sep).join('/').startsWith('src/adapters/') && /\.(?:[cm]?ts|[cm]?js)$/.test(file)) {
         const source = await readFile(file, 'utf8');
         if (/\bfrom\s+["'](?:openclaw\/|@deepseek-ai\/)|\bimport\s*\(["'](?:openclaw\/|@deepseek-ai\/)/.test(source)) violations.push(file);
       }
