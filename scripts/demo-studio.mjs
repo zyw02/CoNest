@@ -44,7 +44,7 @@ const model=createServer(async(req,res)=>{try{
   let name,args,final;
   if(task.includes('采购申请')) {
    if(results.length===0){name='bridge_capabilities';args={};}
-   else if(results.length===1){let catalogue=JSON.parse(text(results[0]));if(catalogue.content)catalogue=JSON.parse(text(catalogue));name='bridge_invoke';args={capability:'office_check',generation:catalogue.generation,args:{attachment:false}};}
+   else if(results.length===1){let catalogue=JSON.parse(text(results[0]));if(catalogue.tool&&catalogue.result)catalogue=catalogue.result;if(catalogue.content)catalogue=JSON.parse(text(catalogue));name='bridge_invoke';args={capability:'office_check',generation:catalogue.generation,args:{attachment:false}};}
    else final='采购检查结果：'+text(results.at(-1));
   } else if(task.includes('请记住：'))final='已记住项目代号青竹，汇报偏好为先结论、后证据。';
   else if(task.includes('根据共享记忆')||task.includes('刚才记住')) {
@@ -53,6 +53,8 @@ const model=createServer(async(req,res)=>{try{
   } else if(results.length===0){name='read';args={path:'evidence.txt'};}
   else if(results.length===1){name='dsh_grep';args={pattern:'CoNest',path:'.'};}
   else final='已由当前 Loop 完成双方工具调用。OpenClaw read 和 DSH dsh_grep 均返回：CoNest connects OpenClaw tools and DSH tools in one agent task. 验收标记：CONEST_BOTH_TOOLS_OK。';
+  // Newer hosts expose catalog tools through their policy-aware dispatcher.
+  if(name&&!offered.includes(name)&&offered.includes('tool_call')){args={id:name,args};name='tool_call';}
   if(name&&!offered.includes(name))throw Error('Required tool not offered: '+name+'; offered='+offered.join(','));
   const message=name?{role:'assistant',content:null,tool_calls:[{id:'call_'+randomUUID().replaceAll('-',''),type:'function',function:{name,arguments:JSON.stringify(args)}}]}:{role:'assistant',content:final};
   output={id:'chatcmpl-'+randomUUID(),object:'chat.completion',model:'deepseek-v4-flash',choices:[{index:0,message,finish_reason:name?'tool_calls':'stop'}],usage:{prompt_tokens:100,completion_tokens:30,total_tokens:130}};

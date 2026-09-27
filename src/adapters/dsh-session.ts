@@ -33,7 +33,7 @@ export function createDetachedSession(id: SessionId, cwd: string): Session {
   });
 }
 
-type SessionToolResult = { toolCallId: string; content: ContentBlock[]; isError?: boolean };
+type SessionToolResult = { toolCallId: string; content: readonly ContentBlock[]; isError?: boolean };
 
 function isLegacyToolResult(block: unknown): block is SessionToolResult & { type: 'tool-result' } {
   if (!block || typeof block !== 'object') return false;

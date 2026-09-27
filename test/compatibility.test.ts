@@ -8,6 +8,7 @@ import {
   DSH_TESTED_VERSIONS,
   OPENCLAW_COMPATIBILITY_RANGE,
   OPENCLAW_TESTED_VERSION,
+  OPENCLAW_TESTED_VERSIONS,
   inspectCompatibility,
   inspectDsh,
   inspectOpenClaw,
@@ -42,6 +43,7 @@ test('keeps published compatibility metadata aligned with package discovery meta
   assert.equal(pkg.openclaw.compat.pluginApi, OPENCLAW_COMPATIBILITY_RANGE);
   assert.equal(pkg.openclaw.compat.minGatewayVersion, `${compatibility.adapters.openclaw.minimum}-0`);
   assert.equal(compatibility.adapters.dsh.supported, DSH_COMPATIBILITY_RANGE);
+  assert.deepEqual(compatibility.adapters.openclaw.tested, [...OPENCLAW_TESTED_VERSIONS]);
   assert.deepEqual(compatibility.adapters.dsh.tested, [...DSH_TESTED_VERSIONS]);
   assert.deepEqual(compatibility.adapters.dsh.qualifications.map((entry: { version: string }) => entry.version), [...DSH_TESTED_VERSIONS]);
   assert.equal(compatibility.contracts.runtimeProtocol, 4);
