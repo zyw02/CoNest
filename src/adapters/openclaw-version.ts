@@ -23,9 +23,10 @@ export function createHostAgentsConfig<T extends object, E extends object>(agent
   return { ownership: 'explicit' as const, ...agents };
 }
 
-/** Legacy Gateways classify plugin inventory as an administrative method. */
-export function gatewayRequestScopes(method: string): Array<'operator.read' | 'operator.write' | 'operator.admin'> {
-  if (method === 'plugins.list') return openClawContract === 'legacy-v1'
-    ? ['operator.read', 'operator.admin'] : ['operator.read'];
-  return method === 'tools.catalog' ? ['operator.read'] : ['operator.read', 'operator.write'];
+/** Numeric host repacks implement the API of their base release. */
+export function assertPluginHostCompatibility(requiredApi: unknown): void {
+  if (typeof requiredApi !== 'string' || !semver.validRange(requiredApi)
+    || !semver.satisfies(openClawVersion.replace(/-\d+$/, ''), requiredApi)) {
+    throw new Error(`Provider requires OpenClaw ${String(requiredApi)}; installed ${openClawVersion}. Install the provider release matching the host.`);
+  }
 }

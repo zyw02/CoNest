@@ -2,7 +2,6 @@ import path from 'node:path';
 import * as transcript from 'openclaw/plugin-sdk/session-transcript-runtime';
 import * as harness from 'openclaw/plugin-sdk/agent-harness-runtime';
 import * as sessions from 'openclaw/plugin-sdk/session-store-runtime';
-import { openClawContract } from './openclaw-version.js';
 
 type Append = typeof transcript.appendSessionTranscriptMessageByIdentityStrict;
 type AppendParams = Parameters<Append>[0];
@@ -22,7 +21,7 @@ function legacyTarget(params: Identity): string | undefined {
 }
 
 export const appendSessionTranscriptMessageByIdentityStrict: Append = async params => {
-  if (openClawContract === 'scoped-v2') return transcript.appendSessionTranscriptMessageByIdentityStrict(params);
+  if (typeof transcript.appendSessionTranscriptMessageByIdentityStrict === 'function') return transcript.appendSessionTranscriptMessageByIdentityStrict(params);
   // Capture a read-only target. The old by-identity writer can recreate session
   // metadata, so it must not be used after a concurrent reset or deletion.
   const transcriptPath = legacyTarget(params);
@@ -44,7 +43,7 @@ export const appendSessionTranscriptMessageByIdentityStrict: Append = async para
 };
 
 export const publishSessionTranscriptUpdateByIdentity: typeof transcript.publishSessionTranscriptUpdateByIdentity = async params => {
-  if (openClawContract === 'scoped-v2') return transcript.publishSessionTranscriptUpdateByIdentity(params);
+  if (typeof transcript.appendSessionTranscriptMessageByIdentityStrict === 'function') return transcript.publishSessionTranscriptUpdateByIdentity(params);
   const sessionFile = legacyTarget(params);
   if (sessionFile) {
     const emit = Reflect.get(harness, 'emitSessionTranscriptUpdate') as (file: string) => void;

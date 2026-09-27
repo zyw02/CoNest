@@ -1,4 +1,4 @@
-import { toolResultBlocks, type SessionEvent } from '../src/adapters/dsh-session.js';
+import { sessionToolResults, type SessionEvent } from '../src/adapters/dsh-session.js';
 import { openClawContract } from '../src/adapters/openclaw-version.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -99,8 +99,13 @@ test('failed attempts remain failures for legacy hosts consuming promptError', a
   }
 });
 
-test('mixed session messages retain tool outcomes without misclassifying commentary', () => {
-  const result = { type: 'tool-result', toolCallId: 'call', content: [{ type: 'text', text: 'denied' }], isError: true };
-  const event = { type: 'tool/result', data: { message: { content: [{ type: 'text', text: 'commentary' }, result] } } };
-  assert.deepEqual(toolResultBlocks(event as unknown as Extract<SessionEvent, { type: 'tool/result' }>), [result]);
+test('both session result contracts preserve failures and ignore surrounding commentary', () => {
+  const outcome = { toolCallId: 'call', content: [{ type: 'text', text: 'denied' }], isError: true };
+  for (const message of [
+    { role: 'user', content: [{ type: 'text', text: 'commentary' }, { type: 'tool-result', ...outcome }] },
+    { role: 'tool', ...outcome },
+  ]) {
+    const event = { type: 'tool/result', data: { message } };
+    assert.deepEqual(sessionToolResults(event as unknown as Extract<SessionEvent, { type: 'tool/result' }>), [outcome]);
+  }
 });

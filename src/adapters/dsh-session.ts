@@ -1,3 +1,4 @@
+import type { ContentBlock } from './dsh-llm.js';
 export { Session, SessionId, SESSION_FORMAT_VERSION, default as SessionStore } from '@deepseek-ai/dsh-session';
 export type { SessionEvent } from '@deepseek-ai/dsh-session';
 
@@ -32,7 +33,23 @@ export function createDetachedSession(id: SessionId, cwd: string): Session {
   });
 }
 
-/** Newer session events may include commentary beside the tool result. */
-export function toolResultBlocks(event: Extract<SessionEvent, { type: 'tool/result' }>) {
-  return event.data.message.content.filter(block => block.type === 'tool-result');
+type SessionToolResult = { toolCallId: string; content: ContentBlock[]; isError?: boolean };
+
+function isLegacyToolResult(block: unknown): block is SessionToolResult & { type: 'tool-result' } {
+  if (!block || typeof block !== 'object') return false;
+  return Reflect.get(block, 'type') === 'tool-result'
+    && typeof Reflect.get(block, 'toolCallId') === 'string' && Array.isArray(Reflect.get(block, 'content'));
+}
+
+/** Normalize block-based results and the newer role=tool message contract. */
+export function sessionToolResults(event: Extract<SessionEvent, { type: 'tool/result' }>): SessionToolResult[] {
+  const message = event.data.message;
+  if ('toolCallId' in message && typeof message.toolCallId === 'string') {
+    return [{ toolCallId: message.toolCallId, content: message.content,
+      isError: 'isError' in message && message.isError === true }];
+  }
+  const blocks: readonly unknown[] = message.content;
+  return blocks.filter(isLegacyToolResult).map(block => ({
+    toolCallId: block.toolCallId, content: block.content, isError: block.isError === true,
+  }));
 }

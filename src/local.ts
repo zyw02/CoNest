@@ -1,4 +1,4 @@
-import { createHostAgentsConfig } from './adapters/openclaw-version.js';
+import { assertPluginHostCompatibility, createHostAgentsConfig } from './adapters/openclaw-version.js';
 import { Ajv } from 'ajv';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -73,8 +73,11 @@ export async function localInstallation(): Promise<{ host: string; provider: str
       break;
     }
     if (!root) throw new BridgeError('INSTALLATION_INCOMPLETE', `Install ${name}@${OPENCLAW_COMPATIBILITY_RANGE} beside the CoNest Connector package`);
-    const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')) as { version?: unknown };
-    try { inspectOpenClaw(manifest.version); }
+    const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')) as { version?: unknown; openclaw?: { compat?: { pluginApi?: unknown } }; peerDependencies?: { openclaw?: unknown } };
+    try {
+      if (name === 'openclaw') inspectOpenClaw(manifest.version);
+      else assertPluginHostCompatibility(manifest.openclaw?.compat?.pluginApi ?? manifest.peerDependencies?.openclaw);
+    }
     catch (error) { throw new BridgeError('HOST_VERSION_MISMATCH', `${name}: ${String(error)}`); }
     roots.push(root);
   }

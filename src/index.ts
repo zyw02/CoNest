@@ -13,7 +13,6 @@ import { Type } from 'typebox';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { inside, readConfig, resolveConfig } from './config.js';
 import { borrowHost } from './shared-host.js';
 import { configuredHostCeiling, hostPrincipal } from './host-policy.js';
@@ -125,7 +124,9 @@ function createState(api: OpenClawPluginApi): PluginState {
   const config = configFile
     ? readConfig(configFile, memoryFilePath)
     : resolveConfig({ workspaceRoot: configuredWorkspace ? path.resolve(base, configuredWorkspace) : base }, base, memoryFilePath);
-  const workerFile = fileURLToPath(new URL('./worker.js', import.meta.url));
+  // A host reload snapshot is not an installed native dependency tree. Start
+  // the owned worker from the host-declared plugin installation instead.
+  const workerFile = path.join(api.rootDir ?? path.resolve(path.dirname(api.source), '..'), 'dist', 'worker.js');
   const shared = borrowHost(JSON.stringify([configFile ? realpathSync(configFile) : `workspace:${config.workspaceRoot}`, config.memoryFilePath]), {
     workerFile, memoryFilePath,
     ...(configFile ? { configFile } : { workspaceRoot: config.workspaceRoot }),

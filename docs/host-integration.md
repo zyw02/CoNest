@@ -233,15 +233,21 @@ The build SDK remains pinned to `2026.9.2`. Runtime compatibility starts at
 `2026.7.1`, including numeric repacks, and is exercised against every published
 stable release through npm `latest` on Linux and Windows. Named alpha/beta
 channels are not part of that promise. A matrix job builds the plugin first,
-selects the real host version, then checks adapter behavior, plugin activation, and a real Gateway/Studio
+selects the real host and matching official provider releases, then checks adapter behavior, plugin activation, and a real Gateway/Studio
 run using a deterministic local model transport. Both Agent Loops execute native
 and CoNest tools, shared memory and generic component calls. Test reports identify the installed host and platform; a Linux
-result does not qualify native Windows execution.
+result does not qualify native Windows execution. The compiled plugin is staged
+outside the host installation, as in a release deployment. OpenClaw 2026.9.5+
+can misidentify its own bundled plugins when the host is installed beneath a
+plugin's root; keep these installations separate. CoNest starts its owned worker
+from the host-declared plugin installation, preserving native dependency layout
+instead of treating a host reload snapshot as a worker installation.
 
 Version-specific code stays in `src/adapters/`. The older V1 harness contract
 and the scoped V2 contract share CoNest's execution path. The adapter translates
 prompt builders, terminal results, transcript persistence and Control UI
-surfaces; the current host retains its native implementations. Configuration
+surfaces. Transcript storage and harness APIs have separate upgrade boundaries;
+the current host retains its native implementations. Configuration
 readers follow runtime refreshes. An explicit empty tool allowlist always means
 no tools. Missing approval support returns unavailable, never approval.
 
@@ -264,6 +270,8 @@ CONEST_EXPECT_OPENCLAW_VERSION=2026.7.1 CONEST_REPORT_PROFILE=openclaw-2026.7.1 
   node scripts/test-openclaw-matrix.mjs
 ```
 
+Use the official provider release matching the host; numeric host repacks reuse
+the base provider release. Local setup rejects incompatible provider API metadata.
 The selector restores `package.json` and leaves `pnpm-lock.yaml` unchanged.
 Run `pnpm install --frozen-lockfile` to restore the build SDK before compiling
 again. Runtime selection belongs in a disposable checkout with its own

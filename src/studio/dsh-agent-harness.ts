@@ -21,7 +21,7 @@ import {
 } from "../adapters/openclaw-sdk.js";
 import { HOST_TOOL_NAMES } from "../host-adapter.js";
 import type { CordisBridgeHost, AgentRunResult } from "./cordis-bridge-host.js";
-import { toolResultBlocks, type SessionEvent } from "../adapters/dsh-session.js";
+import { sessionToolResults, type SessionEvent } from "../adapters/dsh-session.js";
 import { CordisAgentRunError } from "./agent-error.js";
 
 export type DshAgentHarnessOptions = {
@@ -520,7 +520,7 @@ function createDshEventBridge(params: EmbeddedRunAttemptParamsV2): {
         return;
       }
       if (event.type === "tool/result") {
-        for (const block of toolResultBlocks(event)) {
+        for (const block of sessionToolResults(event)) {
           const call = toolCalls.get(block.toolCallId);
           if (!call) continue;
           const replaySafe = isReadOnlyDshTool(call.name);

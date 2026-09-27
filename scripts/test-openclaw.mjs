@@ -11,7 +11,7 @@ import { packageVersion, reportDirectory, reportPath } from './report-path.mjs';
 
 const execute = promisify(execFile);
 const require = createRequire(import.meta.url);
-const pluginRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+const pluginRoot = path.resolve(process.env.CONEST_PLUGIN_ROOT ?? fileURLToPath(new URL('..', import.meta.url)));
 const openClawEntry = require.resolve('openclaw/plugin-sdk/plugin-entry');
 const openClawRoot = path.resolve(path.dirname(openClawEntry), '../..');
 const openClawCli = path.join(openClawRoot, 'openclaw.mjs');

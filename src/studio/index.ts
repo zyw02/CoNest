@@ -1,4 +1,4 @@
-import { gatewayRequestScopes } from '../adapters/openclaw-version.js';
+import { gatewayRequestScopes, selectGatewayAgentRuntime } from '../adapters/openclaw-gateway.js';
 import type { MemoryAccess } from '../memory-adapter.js';
 import { callGatewayFromCli, isIncognitoSessionKey, type OpenClawPluginApi } from '../adapters/openclaw-sdk.js';
 import { mkdirSync, readFileSync, realpathSync } from 'node:fs';
@@ -204,10 +204,9 @@ export function registerStudio(api: OpenClawPluginApi, workspaceRoot: string, ru
           const body = JSON.parse(raw);
           if (!(dshEnabled ? ['openclaw', 'dsh'] : ['openclaw']).includes(body.loop) || typeof body.message !== 'string' || !body.message.trim()) throw new Error('请选择 Loop 并输入任务');
           const sessionKey = `agent:main:conest-${crypto.randomUUID()}`;
-          const selection = await gatewayRequest<{ runId?: string }>('chat.send', {
-            sessionKey, message: `/model deepseek/deepseek-v4-flash --runtime ${body.loop === 'dsh' ? 'auto' : 'openclaw'}`, idempotencyKey: crypto.randomUUID(),
+          await selectGatewayAgentRuntime(gatewayRequest, {
+            sessionKey, model: 'deepseek/deepseek-v4-flash', runtime: body.loop,
           });
-          if (selection.runId) await gatewayRequest('agent.wait', { runId: selection.runId, timeoutMs: 10_000 });
           const run = await gatewayRequest('agent', { sessionKey, message: body.message, idempotencyKey: crypto.randomUUID() });
           activity.record({ kind: 'run.start', loop: body.loop, sessionKey, state: 'running', text: body.message });
           res.end(JSON.stringify({ sessionKey, run }));
