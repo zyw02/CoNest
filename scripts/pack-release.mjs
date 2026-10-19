@@ -25,7 +25,7 @@ const nativeRoot = flags['--native-dir'] ? path.resolve(flags['--native-dir']) :
 const output = flags['--out'] ? path.resolve(flags['--out']) : path.join(source, '.local/releases', target);
 const matches = (list, value) => !list || (!list.includes('!'+value) && (list.every(x=>x.startsWith('!')) || list.includes(value)));
 const compatible = manifest => matches(manifest.os,platform) && matches(manifest.cpu,arch) && (platform!=='linux' || matches(manifest.libc,'glibc'));
-const temporary = await mkdtemp(path.join(os.tmpdir(), 'dsh-bridge-pack-'));
+const temporary = await realpath(await mkdtemp(path.join(os.tmpdir(), 'dsh-bridge-pack-')));
 const stage = path.join(temporary, 'package');
 const packages = new Map();
 const provenance = [];
