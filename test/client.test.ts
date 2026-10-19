@@ -110,7 +110,7 @@ async function delayedAuthorizationClient(t: test.TestContext) {
       } else if (request.method === 'invoke') {
         reply(request.id, { value: ++invocations, generation: 'revision' });
       } else {
-        reply(request.id, {});
+        reply(request.id, request.method === 'release' ? { released: true } : {});
         if (request.method === 'shutdown') break;
       }
     }

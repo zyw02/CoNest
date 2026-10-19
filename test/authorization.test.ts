@@ -91,3 +91,24 @@ test('host run end and caller abort invalidate retained execution bindings', () 
     assert.throws(() => scopes.claim('call-three'), hasCode('CALL_ALREADY_USED'));
   } finally { scopes.close(); }
 });
+
+test('request-ID cleanup revokes only unused grants from the abandoned authorization', async context => {
+  const { workspace } = await fixture(context);
+  await writeFile(path.join(workspace, 'evidence.txt'), 'authorization cleanup fixture\n');
+  const runtime = await BridgeRuntime.create(resolveConfig({ workspaceRoot: workspace }), () => {});
+  try {
+    const input = request(workspace, 'knowledge_search', { query: 'authorization' });
+    const first = runtime.authorize(input, 'first-request');
+    const other = { ...input, taskId: 'other-task', callId: 'other-call' };
+    const second = runtime.authorize(other, 'second-request');
+    assert.equal(runtime.releaseAuthorizationRequest('unknown-request'), false);
+    assert.equal(runtime.status().grants, 2);
+    assert.equal(runtime.releaseAuthorizationRequest('first-request'), true);
+    assert.equal(runtime.releaseAuthorizationRequest('first-request'), false);
+    assert.equal(runtime.status().grants, 1);
+    await assert.rejects(runtime.invoke({ ...input, authorization: first.token }), hasCode('AUTHORIZATION_INVALID'));
+    await runtime.invoke({ ...other, authorization: second.token });
+    assert.equal(runtime.status().grants, 0);
+    assert.equal(runtime.releaseAuthorizationRequest('second-request'), false);
+  } finally { await runtime.close(); }
+});

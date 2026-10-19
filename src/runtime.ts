@@ -161,7 +161,7 @@ export class BridgeRuntime {
     return policyRules(this.current.config.capabilityPolicy, parsePrincipal(request.principal), parseCeiling(request.capabilityCeiling));
   }
 
-  authorize(request: AuthorizationRequest): CallGrant {
+  authorize(request: AuthorizationRequest, requestId?: string): CallGrant {
     if (this.closing) throw new BridgeError('BRIDGE_STOPPING', 'The CoNest Runtime is stopping');
     if (!allowsCapability(request.capability, this.rules(request))) {
       this.policyDenials++;
@@ -187,10 +187,11 @@ export class BridgeRuntime {
     }
     const expiresAt = Math.min(request.expiresAt ?? Infinity, Date.now() + this.current.config.taskTtlMs);
     if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new BridgeError('AUTHORIZATION_EXPIRED', 'The requested task authorization has expired');
-    return this.authority.issue({ ...request, workspaceRoot: requestedWorkspace }, this.current.revision, expiresAt);
+    return this.authority.issue({ ...request, workspaceRoot: requestedWorkspace }, this.current.revision, expiresAt, requestId);
   }
 
   release(authorization: string): boolean { return this.authority.release(authorization); }
+  releaseAuthorizationRequest(requestId: string): boolean { return this.authority.releaseRequest(requestId); }
 
   async invoke(request: InvokeRequest): Promise<InvokeResult> {
     if (this.closing) throw new BridgeError('BRIDGE_STOPPING', 'The CoNest Runtime is stopping');

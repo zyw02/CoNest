@@ -132,6 +132,8 @@ Policy updates are validated and persisted atomically through the live worker. C
 
 Grants bind the principal and host capability ceiling as well as task/call, subject, parent run, canonical workspace, generation, and deadline. Tampering with the principal or widening the ceiling invalidates the one-use grant.
 
+Authorization waits at most ten seconds and respects an earlier caller deadline. Cancellation or timeout revokes the unused reservation by its private-pipe request ID before the call settles, so a delayed token reply cannot block a retry. If the worker cannot confirm cleanup, the owning client stops it instead of reusing uncertain authorization state. This adds an optional request-ID form to the private `release` operation; token-based release remains supported.
+
 Useful errors are `CAPABILITY_DENIED`, `INVALID_POLICY`, `INVALID_PRINCIPAL`, `AUTHORIZATION_MISMATCH`, `POLICY_CHANGED`, and `HOST_POLICY_UNAVAILABLE`. `status.policyDenials` counts worker authorization denials; it is not a durable audit log. The pinned OpenClaw `/tools/invoke` endpoint currently translates worker-thrown denials to HTTP 500, while tools excluded by native policy return 404. E2E assertions check the worker denial counter to distinguish policy refusal from unrelated failures.
 
 ## Upgrade and remaining work

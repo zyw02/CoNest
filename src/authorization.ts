@@ -15,7 +15,7 @@ export type CallScope = {
 };
 export type AuthorizationRequest = CallScope & { expectedGeneration?: string; expiresAt?: number };
 export type CallGrant = { token: string; expiresAt: number; generation: string };
-type Record = CallGrant & { scope: CallScope; timer: NodeJS.Timeout };
+type Record = CallGrant & { scope: CallScope; timer: NodeJS.Timeout; requestId?: string };
 
 /** One-use call grants issued only through the adapter's private process pipe. */
 export class CallAuthority {
@@ -27,11 +27,11 @@ export class CallAuthority {
     return [...this.issued.values()].some(record => record.scope.taskId === taskId);
   }
 
-  issue(scope: CallScope, generation: string, expiresAt: number): CallGrant {
+  issue(scope: CallScope, generation: string, expiresAt: number, requestId?: string): CallGrant {
     const token = randomUUID();
     const timer = setTimeout(() => this.release(token), Math.max(0, expiresAt - Date.now()));
     timer.unref();
-    this.issued.set(token, { token, generation, expiresAt, scope: structuredClone(scope), timer });
+    this.issued.set(token, { token, generation, expiresAt, scope: structuredClone(scope), timer, requestId });
     return { token, generation, expiresAt };
   }
 
@@ -58,6 +58,14 @@ export class CallAuthority {
     clearTimeout(record.timer);
     this.issued.delete(token);
     return true;
+  }
+
+  releaseRequest(requestId: string): boolean {
+    let released = false;
+    for (const [token, record] of this.issued) {
+      if (record.requestId === requestId) released = this.release(token) || released;
+    }
+    return released;
   }
 
   close(): void {

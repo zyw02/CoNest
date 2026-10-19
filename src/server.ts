@@ -139,7 +139,7 @@ export async function serve(options: ServerOptions): Promise<void> {
         result = await manage(request.method, request.params);
         break;
       case 'authorize':
-        result = runtime.authorize(parseAuthorization(request.params));
+        result = runtime.authorize(parseAuthorization(request.params), request.id);
         break;
       case 'catalog': {
         const params = object(request.params);
@@ -149,9 +149,13 @@ export async function serve(options: ServerOptions): Promise<void> {
       case 'invoke':
         result = await runtime.invoke(parseInvoke(request.params));
         break;
-      case 'release':
-        result = { released: runtime.release(requiredString(object(request.params), 'authorization')) };
+      case 'release': {
+        const params = object(request.params);
+        result = { released: params.authorization === undefined
+          ? runtime.releaseAuthorizationRequest(requiredString(params, 'authorizationRequestId'))
+          : runtime.release(requiredString(params, 'authorization')) };
         break;
+      }
       case 'cancel': {
         const params = object(request.params);
         result = { cancelled: runtime.cancel(requiredString(params, 'taskId'), requiredString(params, 'authorization')) };

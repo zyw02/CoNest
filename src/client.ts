@@ -140,7 +140,18 @@ export class BridgeClient {
     if (authorizationTimeoutMs <= 0) throw new BridgeError('AUTHORIZATION_EXPIRED', 'The requested task authorization has expired');
     const grant = await this.request<CallGrant>('authorize', {
       ...scope, expectedGeneration: input.expectedGeneration, expiresAt: input.expiresAt,
-    }, authorizationTimeoutMs);
+    }, authorizationTimeoutMs, input.signal, undefined, async requestId => {
+      try {
+        // The private pipe processes authorize before this release. Revoke the
+        // reservation by request ID even if its token reply has not arrived.
+        const result = await this.request<{ released: boolean }>('release', { authorizationRequestId: requestId }, 1_000);
+        if (typeof result.released !== 'boolean') throw new BridgeError('INVALID_RESPONSE', 'The worker did not confirm authorization cleanup');
+      } catch (error) {
+        // Do not allow retries against a worker with uncertain reservations.
+        await this.stop();
+        throw error;
+      }
+    });
     if (input.onProgress) this.progress.set(input.callId, input.onProgress);
     try {
       input.signal?.throwIfAborted();
@@ -223,7 +234,8 @@ export class BridgeClient {
     this.state = 'stopped';
   }
 
-  private request<T>(method: string, params: unknown, timeoutMs: number, signal?: AbortSignal, onAbort?: () => void): Promise<T> {
+  private request<T>(method: string, params: unknown, timeoutMs: number, signal?: AbortSignal, onAbort?: () => void,
+    onAbandon?: (requestId: string) => Promise<void>): Promise<T> {
     const child = this.child;
     if (!child || !child.stdin.writable) return Promise.reject(new BridgeError('BRIDGE_UNAVAILABLE', 'The CoNest Runtime process is not running'));
     if (signal?.aborted) return Promise.reject(signal.reason);
@@ -234,18 +246,19 @@ export class BridgeClient {
       if (Buffer.byteLength(frame) > (this.options.maxPayloadBytes ?? 256_000)) throw new BridgeError('PAYLOAD_TOO_LARGE', 'The request exceeds the configured payload limit');
     } catch (error) { return Promise.reject(error); }
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.removePending(id);
+      const abandon = (reason: unknown): void => {
+        const pending = this.removePending(id);
+        if (!pending) return;
         onAbort?.();
-        reject(new BridgeError('BRIDGE_TIMEOUT', `${method} did not respond within ${timeoutMs}ms`));
-      }, timeoutMs);
+        if (onAbandon) void onAbandon(id).then(() => reject(reason), reject);
+        else reject(reason);
+      };
+      const timer = setTimeout(() => abandon(new BridgeError('BRIDGE_TIMEOUT', `${method} did not respond within ${timeoutMs}ms`)), timeoutMs);
       timer.unref();
       const pending: Pending = { resolve: value => resolve(value as T), reject, timer, signal };
       if (signal) {
         pending.abort = () => {
-          this.removePending(id);
-          onAbort?.();
-          reject(signal.reason ?? new BridgeError('TASK_CANCELLED', 'The task was cancelled'));
+          abandon(signal.reason ?? new BridgeError('TASK_CANCELLED', 'The task was cancelled'));
         };
         signal.addEventListener('abort', pending.abort, { once: true });
       }
