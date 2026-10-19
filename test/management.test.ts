@@ -78,11 +78,16 @@ test('failed upgrades preserve old code and persisted configuration, and success
     assert.equal(runtime.status().revision, oldRevision);
     assert.equal(await readFile(configFile, 'utf8'), oldConfig);
 
-    const input = request(workspace, 'provider_read', { delayMs: 150 });
+    const entered = Promise.withResolvers<void>();
+    process.once(`${event}-entered`, entered.resolve);
+    const input = request(workspace, 'provider_read', { waitForRelease: true });
     const grant = runtime.authorize(input);
     const oldWork = runtime.invoke({ ...input, authorization: grant.token });
-    const changed = await manager.apply({ action: 'upgrade', id: 'provider', manifest: versionTwo });
-    assert.equal(changed.retiredGenerations, 1);
+    await entered.promise;
+    try {
+      const changed = await manager.apply({ action: 'upgrade', id: 'provider', manifest: versionTwo });
+      assert.equal(changed.retiredGenerations, 1);
+    } finally { process.emit(`${event}-release`); }
     assert.equal((await oldWork).value, '1.0.0:default');
     assert.equal((await invoke(runtime, workspace, 'consumer_read')).value, '1.1.0:default');
     assert.equal(runtime.status().retiredGenerations, 0);
@@ -101,7 +106,7 @@ async function fixtureComponent(root: string, id: string, version: string, event
     configSchema: { type: 'object', additionalProperties: false, properties: { label: { type: 'string' } } },
     capabilities: [{
       name: `${id}_read`, description: 'Read the provider fixture version', permissions: ['workspace:read'],
-      inputSchema: { type: 'object', additionalProperties: false, properties: { delayMs: { type: 'integer', minimum: 0, maximum: 1000 } } },
+      inputSchema: { type: 'object', additionalProperties: false, properties: { delayMs: { type: 'integer', minimum: 0, maximum: 1000 }, waitForRelease: { type: 'boolean' } } },
       outputSchema: { type: 'string' },
     }],
   };
@@ -115,6 +120,15 @@ async function fixtureComponent(root: string, id: string, version: string, event
       });
       ${broken ? "throw new Error('Candidate activation failed');" : ''}
       ctx.bridgeCapabilities.register(ctx, '${id}_read', async (args, invocation) => {
+        if (args.waitForRelease) await new Promise((resolve, reject) => {
+          const cleanup = () => { process.off('${event}-release', release); invocation.signal.removeEventListener('abort', abort); };
+          const release = () => { cleanup(); resolve(); };
+          const abort = () => { cleanup(); reject(invocation.signal.reason); };
+          process.once('${event}-release', release);
+          invocation.signal.addEventListener('abort', abort, { once: true });
+          if (invocation.signal.aborted) abort();
+          else process.emit('${event}-entered');
+        });
         if (args.delayMs) await new Promise((resolve, reject) => {
           const abort = () => { clearTimeout(timer); reject(invocation.signal.reason); };
           const timer = setTimeout(() => { invocation.signal.removeEventListener('abort', abort); resolve(); }, args.delayMs);
