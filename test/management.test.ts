@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -87,7 +88,7 @@ test('failed upgrades preserve old code and persisted configuration, and success
     try {
       const changed = await manager.apply({ action: 'upgrade', id: 'provider', manifest: versionTwo });
       assert.equal(changed.retiredGenerations, 1);
-    } finally { process.emit(`${event}-release`); }
+    } finally { EventEmitter.prototype.emit.call(process, `${event}-release`); }
     assert.equal((await oldWork).value, '1.0.0:default');
     assert.equal((await invoke(runtime, workspace, 'consumer_read')).value, '1.1.0:default');
     assert.equal(runtime.status().retiredGenerations, 0);
