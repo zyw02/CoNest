@@ -16,7 +16,16 @@ for (const [entry,out] of [['src/studio/index.ts','dist/studio/index.js'],['src/
  await writeFile(path.join(root,out+'.meta.json'),JSON.stringify(result.metafile));
 }
 // Retain provenance and upstream notices for JavaScript folded into the bundles.
-const {mkdir, readdir, cp} = await import('node:fs/promises');
+const {mkdir, readdir, cp, stat} = await import('node:fs/promises');
+// The bundled persistence backend resolves its migration verifier beside the
+// bundle. Launch the original package worker so its own relative metadata and
+// dependencies retain their upstream meaning.
+const persistenceWorker = path.join(path.dirname(require.resolve('@deepseek-ai/dsh-session-persistence-jsonl')), 'worker.cjs');
+try {
+ await stat(persistenceWorker);
+ await writeFile(path.join(root, 'dist/studio/worker.cjs'), "const path = require('node:path');\nrequire(path.join(path.dirname(require.resolve('@deepseek-ai/dsh-session-persistence-jsonl')), 'worker.cjs'));\n");
+}
+catch (error) { if (error.code !== 'ENOENT') throw error; }
 const licenses=path.join(root,'dist/studio-licenses');await mkdir(licenses,{recursive:true});
 const seen=new Map();
 for(const out of ['dist/studio/index.js','dist/studio/host-runtime.js','dist/mcp-memory-server.mjs','dist/studio/runtime-probe.mjs']) {

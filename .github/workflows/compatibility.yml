@@ -114,3 +114,20 @@ jobs:
         if: startsWith(matrix.source, 'upstream-')
         run: pnpm install --lockfile=false
       - run: pnpm test:dsh-matrix
+      - name: Detect migration-worker qualification
+        if: startsWith(matrix.source, 'upstream-')
+        id: migration
+        run: node -e 'const fs=require("node:fs"),p=require("node:path");process.stdout.write(`needed=${fs.existsSync(p.join(p.dirname(require.resolve("@deepseek-ai/dsh-session-persistence-jsonl")),"worker.cjs"))}\n`)' >> "$GITHUB_OUTPUT"
+      - name: Verify stored-session upgrade from the frozen SDK
+        if: steps.migration.outputs.needed == 'true'
+        run: |
+          conest_frozen="$RUNNER_TEMP/frozen-dsh"
+          mkdir "$conest_frozen"
+          git archive HEAD | tar -x -C "$conest_frozen"
+          node "$conest_frozen/scripts/maintenance/bootstrap.mjs"
+          (
+            cd "$conest_frozen"
+            pnpm install --frozen-lockfile
+            pnpm build
+          )
+          node scripts/test-dsh-upgrade.mjs --legacy-worker "$conest_frozen/dist/worker.js" --current-worker "$GITHUB_WORKSPACE/dist/worker.js"
