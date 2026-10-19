@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, open, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -22,7 +22,7 @@ test('managed read preserves DSH windows, validation, truncation and UTF-8 error
   await writeFile(path.join(f.workspace, 'source.txt'), '第一行\r\nsecond\r\nthird\r\n');
   const result = await f.read({ file_path: 'source.txt', offset: 2, limit: 1 });
   assert.equal(result.isError, false);
-  assert.deepEqual(result.value, { path: path.join(f.workspace, 'source.txt'), offset: 2, lines: [{ number: 2, text: 'second' }], totalLines: 3 });
+  assert.deepEqual(result.value, { path: await realpath(path.join(f.workspace, 'source.txt')), offset: 2, lines: [{ number: 2, text: 'second' }], totalLines: 3 });
   assert.match(result.content[0].text, /2: second/);
   assert.equal(result.observation?.observation.kind, 'present');
   const pastEnd = await f.read({ file_path: path.join(f.workspace, 'source.txt'), offset: 99 });

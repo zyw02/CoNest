@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { rm, writeFile } from 'node:fs/promises';
+import { realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +52,20 @@ test('only bounded task data reaches the component; identity and permissions rem
     assert.equal(f.calls[0]!.parentTaskId, 'run');
     assert.equal(f.calls[0]!.expectedGeneration, 'g1');
     assert.ok(f.calls[0]!.signal?.aborted, 'Scope is disposed after contribution');
+  } finally { f.close(); }
+});
+
+test('workspace aliases contribute context through the same canonical authorization boundary', { skip: process.platform === 'win32' }, async t => {
+  const { workspace, root } = await fixture(t);
+  const alias = path.join(root, 'workspace-alias');
+  await symlink(workspace, alias, 'dir');
+  const f = harness(alias);
+  try {
+    const result = await f.provider.collect('task', { ...f.context, workspaceDir: workspace });
+    assert.ok(result?.startsWith(CONTEXT_PREFIX));
+    assert.equal(f.calls[0]!.workspaceRoot, await realpath(workspace));
+    assert.equal(await f.provider.collect('task', { ...f.context, workspaceDir: root }), undefined);
+    assert.equal(f.calls.length, 1);
   } finally { f.close(); }
 });
 

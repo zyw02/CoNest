@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -8,12 +8,14 @@ import { BridgeClient } from '../src/client.js';
 
 test('DSH runs in the component Host; tool callbacks can reenter the same runtime', async t => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), 'conest-host-'));
+  const setupWorkspace = process.platform === 'win32' ? workspace : `${workspace}-alias`;
+  if (setupWorkspace !== workspace) await symlink(workspace, setupWorkspace, 'dir');
   const client = new BridgeClient({ workerFile: fileURLToPath(new URL('../dist/worker.js', import.meta.url)),
     workspaceRoot: workspace, startupTimeoutMs: 30_000, shutdownTimeoutMs: 5_000 });
-  t.after(async () => { await client.stop(); await rm(workspace, { recursive: true, force: true }); });
+  t.after(async () => { await client.stop(); if (setupWorkspace !== workspace) await rm(setupWorkspace, { force: true }); await rm(workspace, { recursive: true, force: true }); });
   await writeFile(path.join(workspace, 'evidence.txt'), 'HOST_SHARED_SERVICE_OK\n');
   const runtime = await client.start();
-  const setup = { workspaceRoot: workspace, enableBridgeProofAdapter: true };
+  const setup = { workspaceRoot: setupWorkspace, enableBridgeProofAdapter: true };
   const support = await client.extension<{ pid: number; parentPid: number }>({ operation: 'start', setup });
   assert.equal(support.pid, runtime.pid);
   assert.equal(support.parentPid, process.pid);
@@ -53,6 +55,7 @@ test('DSH runs in the component Host; tool callbacks can reenter the same runtim
   await new Promise(resolve => setTimeout(resolve, 1500));
   assert.equal((await client.status()).pid, support.pid, 'Cooperative cancellation must preserve Host');
   await assert.rejects(client.extension({ operation: 'start', setup: { workspaceRoot: os.tmpdir() } }), /Host workspace/);
+  await assert.rejects(client.extension({ operation: 'start', setup: { workspaceRoot: path.join(workspace, 'missing-root') } }), /Host workspace/);
 
   const pendingTool = Promise.withResolvers<void>();
   const releaseTool = Promise.withResolvers<void>();

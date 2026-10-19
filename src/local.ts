@@ -1,4 +1,3 @@
-import { assertPluginHostCompatibility, createHostAgentsConfig } from './adapters/openclaw-version.js';
 import { Ajv } from 'ajv';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -76,7 +75,10 @@ export async function localInstallation(): Promise<{ host: string; provider: str
     const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')) as { version?: unknown; openclaw?: { compat?: { pluginApi?: unknown } }; peerDependencies?: { openclaw?: unknown } };
     try {
       if (name === 'openclaw') inspectOpenClaw(manifest.version);
-      else assertPluginHostCompatibility(manifest.openclaw?.compat?.pluginApi ?? manifest.peerDependencies?.openclaw);
+      else {
+        const { assertPluginHostCompatibility } = await import('./adapters/openclaw-version.js');
+        assertPluginHostCompatibility(manifest.openclaw?.compat?.pluginApi ?? manifest.peerDependencies?.openclaw);
+      }
     }
     catch (error) { throw new BridgeError('HOST_VERSION_MISMATCH', `${name}: ${String(error)}`); }
     roots.push(root);
@@ -92,6 +94,7 @@ function assertPlatform(): void {
 export async function setupLocal(directory: string, options: { workspace: string; credentials: string; port?: number }): Promise<LocalProfile> {
   assertPlatform();
   const installation = await localInstallation();
+  const { createHostAgentsConfig } = await import('./adapters/openclaw-version.js');
   const workspaceRoot = await realpath(options.workspace);
   if (!(await lstat(workspaceRoot)).isDirectory()) throw new BridgeError('WORKSPACE_INVALID', 'The workspace must be an existing directory');
   const credentialFile = path.resolve(options.credentials);

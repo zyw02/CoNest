@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
+import { realpathSync } from 'node:fs';
 import { BridgeError } from './types.js';
 import type { BridgeConfig } from './types.js';
 import type { HostCallback } from './extension-protocol.js';
@@ -22,7 +22,9 @@ export class ExtensionHost {
     const allowed = ['start', 'status', 'execute', 'observeRead', 'runHarnessAgent', 'runAgent', 'endHarnessSession'];
     if (!allowed.includes(input.operation)) throw new BridgeError('METHOD_NOT_FOUND', 'Unknown support pack operation');
     const setup = input.setup;
-    if (!setup || path.resolve(setup.workspaceRoot ?? '') !== this.config.workspaceRoot) {
+    let workspaceRoot: string | undefined;
+    try { if (typeof setup?.workspaceRoot === 'string') workspaceRoot = realpathSync(setup.workspaceRoot); } catch { /* Invalid roots are denied below. */ }
+    if (workspaceRoot !== this.config.workspaceRoot) {
       throw new BridgeError('PERMISSION_DENIED', 'Support pack must use the Host workspace');
     }
     const lifetime = new AbortController();
@@ -50,7 +52,7 @@ export class ExtensionHost {
     try {
       this.host ??= import('./studio/host-runtime.js').then(module => new module.CordisBridgeHost());
       const host = await this.host;
-      await host.start(setup);
+      await host.start({ ...setup, workspaceRoot });
       lifetime.signal.throwIfAborted();
       const args = input.args ?? {};
       switch (input.operation) {

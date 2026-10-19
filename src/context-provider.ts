@@ -40,11 +40,15 @@ export class ContextProvider {
   private readonly pending = new Set<AbortController>();
   private closed = false;
   private readonly diagnostics: ContextDiagnostics;
+  private readonly workspaceRoot: string;
 
   constructor(private readonly options: {
     config: ContextProviderConfig; host: Pick<BridgeHost, 'catalog' | 'invoke'>; scopes: RunScopes;
     workspaceRoot: string; readHostConfig(): unknown; diagnostics?: ContextDiagnostics;
-  }) { this.diagnostics = options.diagnostics ?? new ContextDiagnostics(); }
+  }) {
+    this.diagnostics = options.diagnostics ?? new ContextDiagnostics();
+    this.workspaceRoot = realpathSync(options.workspaceRoot);
+  }
 
   close(): void {
     this.closed = true;
@@ -89,7 +93,7 @@ export class ContextProvider {
         // The native search factory has already enforced host sandbox/fs policy. Also require
         // an exact canonical workspace match: prompt hooks do not carry a separate fsPolicy.
         if (!['knowledge_search', 'bridge_capabilities', 'bridge_invoke'].every(name => activeAuthority.allows(name))
-          || realpathSync(context.workspaceDir!) !== this.options.workspaceRoot) throw new BridgeError('CONTEXT_DENIED', 'Workspace context is unavailable');
+          || realpathSync(context.workspaceDir!) !== this.workspaceRoot) throw new BridgeError('CONTEXT_DENIED', 'Workspace context is unavailable');
         const principal = hostPrincipal({ agentId: context.agentId, messageChannel: context.channel,
           agentAccountId: context.accountId, requesterSenderId: context.senderId });
         const capabilityCeiling = configuredHostCeiling(this.options.readHostConfig(), context.agentId!, { provider: context.modelProviderId, modelId: context.modelId });
@@ -120,7 +124,7 @@ export class ContextProvider {
           args: { task: prompt.slice(0, 1000), maxChars: config.maxChars },
           taskId: randomUUID(), callId, parentTaskId: context.runId,
           subject: context.sessionKey ?? context.sessionId ?? context.agentId!,
-          workspaceRoot: this.options.workspaceRoot, expiresAt, signal: controller.signal,
+          workspaceRoot: this.workspaceRoot, expiresAt, signal: controller.signal,
           recordProgress: false,
         });
         const fresh = await host.catalog(check());
