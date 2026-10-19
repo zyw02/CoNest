@@ -69,7 +69,7 @@ overrides:
   '@deepseek-ai/schemastery': file:.vendor/dsh/vendor/schemastery
 
 patchedDependencies:
-  node-pty@1.1.0: 458e7b48a7816a232d7839d01b83d334ae023011d333a7c2320218592010ead8
+  node-pty@1.1.0: 679288506704413d713c088585f9451545b972f49ad86784a0801f56ddfbc5c4
 
 importers:
 
@@ -131,7 +131,7 @@ importers:
         version: 3.1.1
       node-pty:
         specifier: 1.1.0
-        version: 1.1.0(patch_hash=458e7b48a7816a232d7839d01b83d334ae023011d333a7c2320218592010ead8)
+        version: 1.1.0(patch_hash=679288506704413d713c088585f9451545b972f49ad86784a0801f56ddfbc5c4)
       semver:
         specifier: 7.8.5
         version: 7.8.5
@@ -4062,7 +4062,7 @@ snapshots:
       '@deepseek-ai/dsh-invariants': file:.vendor/dsh/packages/runtime-diagnostics/invariants(@deepseek-ai/cordis@4.0.1)
       '@deepseek-ai/dsh-subprocess': file:.vendor/dsh/packages/subprocess/subprocess(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@file:.vendor/dsh/packages/runtime-diagnostics/invariants(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-timeout': file:.vendor/dsh/packages/util/timeout(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@file:.vendor/dsh/packages/runtime-diagnostics/invariants(@deepseek-ai/cordis@4.0.1))
-      node-pty: 1.1.0(patch_hash=458e7b48a7816a232d7839d01b83d334ae023011d333a7c2320218592010ead8)
+      node-pty: 1.1.0(patch_hash=679288506704413d713c088585f9451545b972f49ad86784a0801f56ddfbc5c4)
 
   '@deepseek-ai/dsh-subprocess@file:.vendor/dsh/packages/subprocess/subprocess(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@file:.vendor/dsh/packages/runtime-diagnostics/invariants(@deepseek-ai/cordis@4.0.1))':
     dependencies:
@@ -5825,7 +5825,7 @@ snapshots:
 
   node-gyp-build@4.8.4: {}
 
-  node-pty@1.1.0(patch_hash=458e7b48a7816a232d7839d01b83d334ae023011d333a7c2320218592010ead8):
+  node-pty@1.1.0(patch_hash=679288506704413d713c088585f9451545b972f49ad86784a0801f56ddfbc5c4):
     dependencies:
       node-addon-api: 7.1.1
 

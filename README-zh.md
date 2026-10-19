@@ -61,6 +61,8 @@ CoNest 为不同 Agent SDK 定义统一的组件清单与运行协议。OpenClaw
 
 **第一次使用，只需按本节操作。** 已验证的源码启动环境为 Linux x64、Node.js 24.16.0 和 pnpm 11.7.0；还需 Git、tar，以及原生编译所需的 Python 3、make 和 C++ 编译器。
 
+macOS Intel（`x64`）与 Apple Silicon（`arm64`）使用下方相同命令。原生依赖需要 Xcode Command Line Tools（`xcode-select --install`），Node.js 应与 Mac 架构匹配。[macOS 工作流](.github/workflows/macos.yml) 分别检查两种架构，原生验证结果以对应版本的实际运行记录为准。独立安装包与安装脚本见 [macOS 安装说明（英文）](docs/installation.md#macos-integration)。
+
 ```bash
 git clone --branch develop https://github.com/zyw02/CoNest.git
 cd CoNest

@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 const bundle=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(process.argv[2]??path.join(os.homedir(),'conest-demo-0.6.4'));
 const target=process.platform+'-'+process.arch;
-if(!['linux-x64','win32-x64'].includes(target))throw Error('This package supports Linux x64 and Windows x64');
+if(!['linux-x64','win32-x64','darwin-x64','darwin-arm64'].includes(target))throw Error('This package supports Linux x64, Windows x64, and macOS x64/arm64');
 const version=JSON.parse(await readFile(path.join(bundle,'delivery.json'),'utf8')).version;
 const archive=path.join(bundle,'packages',target,`local-conest-connector-${version}.tgz`);
 const expected=(await readFile(archive+'.sha256','utf8')).trim().split(/\s+/)[0];

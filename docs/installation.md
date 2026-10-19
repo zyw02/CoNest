@@ -5,7 +5,7 @@ Use Node.js 24.16.0, pnpm 11.7.0 and an OpenClaw release in the declared compati
 
 ## Build an artifact
 
-Run from `` after installing dependencies:
+Run from the checkout root after installing dependencies:
 
 ```sh
 pnpm run build
@@ -53,3 +53,30 @@ checks the component graph; `start.ps1 -Verify -Core` checks the OpenClaw-only p
 The [Windows workflow](../.github/workflows/windows.yml) builds from source and runs
 native Windows integration checks. Its result applies to the recorded commit and runner;
 packaging alone does not establish Windows desktop compatibility.
+
+## macOS integration
+
+Both Intel (`darwin-x64`) and Apple Silicon (`darwin-arm64`) are admitted by the runtime, source installer and release builder. Use the pinned Node/pnpm versions above; source builds require Xcode Command Line Tools and Python 3. The Linux Landlock binary is optional and is excluded from macOS artifacts. DSH supplies its own macOS process and Seatbelt backends; existing component permissions still apply.
+
+To build an Apple Silicon archive after `pnpm run build`:
+
+```sh
+node scripts/prepare-native.mjs --target darwin-arm64 --out /absolute/native-macos
+node scripts/pack-release.mjs --target darwin-arm64 --native-dir /absolute/native-macos --out /absolute/packages
+node scripts/pack-unix.mjs --target darwin-arm64 --archive /absolute/packages/local-conest-connector-0.6.4.tgz --out /absolute/bundles
+```
+
+Use `darwin-x64` for Intel. Native preparation verifies registry integrity and includes matching sharp/libvips, koffi, ripgrep, system/flock and node-pty assets. The pinned node-pty 1.1.0 prebuild requires its `spawn-helper` to be executable; both the source-install patch and archive preparation set that permission. macOS control sockets use a short private directory under `/tmp` to fit the Unix socket path limit even with a long system `TMPDIR`.
+
+In the resulting `conest-0.6.4-darwin-arm64` (or `darwin-x64`) directory:
+
+```sh
+CONEST_INSTALL_ROOT="$HOME/conest-dev" bash install.sh
+"$HOME/conest-dev/start.sh" --components
+"$HOME/conest-dev/start.sh" --verify
+"$HOME/conest-dev/start.sh" --verify --core
+```
+
+The installer selects the host architecture, downloads the pinned Node.js `.tar.gz`, verifies its exact SHA-256 entry with `sha256sum` or macOS `shasum`, and verifies the plugin checksum before installing. A bundle for the other architecture is rejected. The model fixture needs no API key and incurs no inference charges.
+
+The [macOS workflow](../.github/workflows/macos.yml) runs source tests, native PTY/flock/image/FFI/ripgrep checks, isolated archive installation, service restart checks and deterministic Gateway acceptance on separate Intel and ARM runners. The `/proc` environment inspection is Linux-only; portable environment filtering remains covered by behavior tests. Cross-packaging on Linux validates archive contents and hashes; macOS execution requires a passing native runner result for the same revision.

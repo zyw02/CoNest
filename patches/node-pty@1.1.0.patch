@@ -28,3 +28,13 @@
  var DEFAULT_FILE = 'sh';
  var DEFAULT_NAME = 'xterm';
  var DESTROY_SOCKET_TIMEOUT_MS = 200;
+--- a/scripts/prebuild.js
++++ b/scripts/prebuild.js
+@@ -34 +34,7 @@
++// The 1.1.0 macOS prebuild ships this helper without executable permissions.
++// It is launched directly by posix_spawnp when the terminal is opened.
++if (process.platform === 'darwin') {
++  fs.chmodSync(path.join(PREBUILD_DIR, 'spawn-helper'), 0o755);
++}
++
+ process.exit(0);

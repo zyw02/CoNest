@@ -1,3 +1,4 @@
+export const supportedTargets: readonly string[];
 export function assertRuntime(platform?: string, arch?: string, node?: string, glibc?: string): void;
 export function protectDirectory(directory: string): Promise<void>;
 export function assertPrivateFile(file: string): Promise<void>;

@@ -3,9 +3,10 @@ import {lstat, mkdir} from 'node:fs/promises';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const execute=promisify(execFile);
+export const supportedTargets=Object.freeze(['linux-x64','win32-x64','darwin-x64','darwin-arm64']);
 export function assertRuntime(platform=process.platform,arch=process.arch,node=process.versions.node,glibc=process.report.getReport().header.glibcVersionRuntime){
  const [major,minor]=node.split('.').map(Number);
- assert(arch==='x64' && ['linux','win32'].includes(platform),'CoNest supports Linux x64 (glibc) and Windows x64');
+ assert(supportedTargets.includes(`${platform}-${arch}`),'CoNest supports Linux x64 (glibc), Windows x64, and macOS x64/arm64');
  assert(major===24&&minor>=16,'CoNest requires Node >=24.16.0 <25');
  if(platform==='linux'){const [a,b]=(glibc??'0.0').split('.').map(Number);assert(a>2||a===2&&b>=28,'CoNest requires glibc >=2.28 (RHEL 8 or newer)');}
 }

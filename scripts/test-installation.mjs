@@ -20,7 +20,8 @@ assert.ok(archiveArg, 'Usage: test-installation.mjs ARCHIVE.tgz [--live | --host
 const archive = path.resolve(archiveArg);
 const archiveHash = createHash('sha256').update(await readFile(archive)).digest('hex');
 assert.equal((await readFile(`${archive}.sha256`, 'utf8')).split(/\s+/)[0], archiveHash, 'Archive checksum mismatch');
-const root = await mkdtemp(path.join(os.tmpdir(), 'dsh-bridge-install-'));
+// macOS /var and /tmp are aliases; compare installed paths in one canonical form.
+const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'dsh-bridge-install-')));
 const installation = path.join(root, 'installation');
 const workspace = path.join(root, 'workspace');
 const state = path.join(root, 'profile');
@@ -108,11 +109,13 @@ try {
   assert.equal(installedComponent.pid, before.pid);
   const verified = await bridge('invoke', 'source_verify', JSON.stringify({ query: marker, quote }));
   assert.equal(verified.value.verified, true);
-  const workerEnvironment = await readFile(`/proc/${before.pid}/environ`, 'utf8');
-  for (const name of ['DEEPSEEK_API_KEY=', 'OPENCLAW_GATEWAY_TOKEN=', 'NODE_OPTIONS=']) {
-    assert.equal(workerEnvironment.includes(name), false, 'The worker inherited a sensitive parent setting');
+  if (process.platform === 'linux') {
+    const workerEnvironment = await readFile(`/proc/${before.pid}/environ`, 'utf8');
+    for (const name of ['DEEPSEEK_API_KEY=', 'OPENCLAW_GATEWAY_TOKEN=', 'NODE_OPTIONS=']) {
+      assert.equal(workerEnvironment.includes(name), false, 'The worker inherited a sensitive parent setting');
+    }
   }
-  records.push({ check: 'same-worker component install/invoke and credential-free worker environment', passed: true });
+  records.push({ check: 'same-worker component install/invoke', passed: true, workerEnvironmentInspected: process.platform === 'linux' });
 
   let successfulTask;
   let deniedTask;

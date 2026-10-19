@@ -9,7 +9,7 @@ import { executionEnvironment } from '../src/environment.js';
 import { readLocal, setupLocal, statusLocal, stopLocal, validateLocalBoundary } from '../src/local.js';
 
 async function fixture(t: test.TestContext) {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'bridge-local-test-'));
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'bridge-local-test-')));
   t.after(() => rm(root, { recursive: true, force: true }));
   await protectDirectory(root);
   const workspace = path.join(root, 'workspace');

@@ -6,11 +6,13 @@ import path from 'node:path';
 import {assertRuntime, assertPrivateFile, assertPrivateDirectory, protectDirectory} from '../src/platform-support.mjs';
 import { setTestPermissions } from './file-permissions.js';
 import {executionEnvironment} from '../src/environment.js';
+import {controlAddress, controlRequest, serveControl} from '../src/control.js';
 
-test('platform admission accepts the RHEL 8 baseline and Windows x64 and rejects incompatible runtimes', () => {
+test('platform admission accepts Linux/Windows x64 and both macOS architectures and rejects incompatible runtimes', () => {
   assert.doesNotThrow(() => assertRuntime('linux','x64','24.16.0','2.28'));
   assert.doesNotThrow(() => assertRuntime('win32','x64','24.16.0',undefined));
-  for (const args of [['linux','x64','24.16.0','2.27'],['linux','x64','24.16.0',''],['linux','arm64','24.16.0','2.28'],['win32','x64','24.15.0',undefined],['win32','x64','22.23.1',undefined],['win32','x64','25.0.0',undefined]]) {
+  for (const arch of ['x64','arm64']) assert.doesNotThrow(() => assertRuntime('darwin',arch,'24.16.0',''));
+  for (const args of [['darwin','ia32','24.16.0',''],['darwin','arm64','24.15.0',''],['darwin','arm64','25.0.0',''],['freebsd','x64','24.16.0',''],['linux','x64','24.16.0','2.27'],['linux','x64','24.16.0',''],['linux','arm64','24.16.0','2.28'],['win32','arm64','24.16.0',''],['win32','x64','24.15.0',undefined],['win32','x64','22.23.1',undefined],['win32','x64','25.0.0',undefined]]) {
     assert.throws(() => assertRuntime(...args));
   }
 });
@@ -41,4 +43,16 @@ test('private state rejects broadened directory and file permissions on the exec
   await assertPrivateDirectory(directory);
   await setTestPermissions(file, 0o644);
   await assert.rejects(assertPrivateFile(file), /owner-only/);
+});
+
+test('local control works with macOS-style long temporary paths', { skip: process.platform !== 'darwin' }, async t => {
+  const root=await mkdtemp(path.join(os.tmpdir(),'conest-control-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const config=path.join(root,'config.json');await writeFile(config,'{}');
+  const previous=process.env.TMPDIR;process.env.TMPDIR=path.join(root,'long-temporary-directory-'.repeat(6));
+  try {
+    assert(Buffer.byteLength(controlAddress(config))<104);
+    const close=await serveControl(config,async()=>({pid:process.pid}));
+    try { assert.equal((await controlRequest(config,'status'))?.pid,process.pid); }
+    finally { await close(); }
+  } finally { if(previous===undefined)delete process.env.TMPDIR;else process.env.TMPDIR=previous; }
 });

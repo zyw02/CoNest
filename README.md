@@ -61,6 +61,8 @@ The standard launch composes DSH execution, shared memory, guarded file access a
 
 **New here? This section is all you need to start.** The validated source environment is Linux x64, Node.js 24.16.0 and pnpm 11.7.0. Install Git, tar, Python 3, make and a C++ compiler for native dependencies.
 
+macOS Intel (`x64`) and Apple Silicon (`arm64`) use the same commands below. Install Xcode Command Line Tools (`xcode-select --install`) for native dependencies and use a Node.js build matching your Mac's architecture. The [macOS workflow](.github/workflows/macos.yml) checks both architectures; native qualification applies to its tested revision. See [macOS packaging](docs/installation.md#macos-integration) for standalone archives and the installer.
+
 ```bash
 git clone --branch develop https://github.com/zyw02/CoNest.git
 cd CoNest

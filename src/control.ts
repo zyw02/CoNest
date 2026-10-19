@@ -11,7 +11,9 @@ import { isWireResponse } from './protocol.js';
 
 function controlLocation(configFile: string): { address: string; directory: string; lockFile: string } {
   const identity = createHash('sha256').update(realpathSync(configFile)).digest('hex').slice(0, 24);
-  const directory = path.join(os.tmpdir(), `dsh-bridge-${process.getuid?.() ?? 'local'}`);
+  // macOS TMPDIR can exceed sockaddr_un's 104-byte path limit. Keep the
+  // authenticated socket in a short, per-user directory on that platform.
+  const directory = path.join(process.platform === 'darwin' ? '/tmp' : os.tmpdir(), `dsh-bridge-${process.getuid?.() ?? 'local'}`);
   const socket = path.join(directory, `${identity}.sock`);
   return { directory, lockFile: socket + '.lock', address: process.platform === 'win32' ? `\\\\.\\pipe\\conest-${identity}` : socket };
 }

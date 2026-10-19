@@ -7,6 +7,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { supportedTargets } from '../src/platform-support.mjs';
+import { nativePackageNames, ptyFiles } from './native-assets.mjs';
 
 // Build a relocatable artifact from installed, pinned packages; never rewrite source packages.
 const execute = promisify(execFile);
@@ -15,9 +17,9 @@ const npmCli = path.join(source, 'node_modules/npm/bin/npm-cli.js');
 const packlist = createRequire(npmCli)('npm-packlist');
 const packResult = output => { const parsed = JSON.parse(output); return Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0]; };
 const args = process.argv.slice(2); const flags = {};
-while (args.length) { const key=args.shift(), value=args.shift(); assert.ok(['--out','--target','--native-dir'].includes(key) && value && !flags[key], 'Usage: pack-release.mjs [--out DIR] [--target linux-x64|win32-x64] [--native-dir DIR]'); flags[key]=value; }
+while (args.length) { const key=args.shift(), value=args.shift(); assert.ok(['--out','--target','--native-dir'].includes(key) && value && !flags[key], `Usage: pack-release.mjs [--out DIR] [--target ${supportedTargets.join('|')}] [--native-dir DIR]`); flags[key]=value; }
 const target = flags['--target'] ?? `${process.platform}-${process.arch}`;
-assert.ok(['linux-x64','win32-x64'].includes(target), 'Unsupported target');
+assert.ok(supportedTargets.includes(target), 'Unsupported target');
 const [platform, arch] = target.split('-');
 const nativeRoot = flags['--native-dir'] ? path.resolve(flags['--native-dir']) : undefined;
 const output = flags['--out'] ? path.resolve(flags['--out']) : path.join(source, '.local/releases', target);
@@ -99,6 +101,8 @@ async function filesIn(directory, base = '') {
 
 try {
   assert.ok(nativeRoot, 'Supply --native-dir with verified target assets; host-built binaries are not a portable release');
+  const nativeProvenance = await readJson(path.join(nativeRoot, 'provenance.json'));
+  assert.equal(nativeProvenance.target, target, 'Native assets do not match the release target');
   const rootManifest = await readJson(path.join(source, 'package.json'));
   await collect(source, { name: rootManifest.name, dependencies: rootManifest.dependencies, optionalDependencies: rootManifest.optionalDependencies });
   await mkdir(stage);
@@ -213,12 +217,17 @@ try {
   await writeFile(path.join(stage, 'runtime-lock.json'), `${JSON.stringify({ bridgeVersion: manifest.version,
     platform, arch, node: process.version, napi: true,
     ...(platform==='linux'?{libc:'2.28', kernel:'4.18'}:{}),
-    nativeAssets: JSON.parse(await readFile(path.join(nativeRoot,'provenance.json'),'utf8')),
+    nativeAssets: nativeProvenance,
     dependencies: provenance.sort((a, b) => a.name.localeCompare(b.name)) }, null, 2)}\n`);
   await writeFile(path.join(stage, 'THIRD_PARTY_NOTICES.md'), `# Third-party runtime notices\n\nCoNest original code is MIT licensed; see LICENSE. Third-party code retains its own licenses and copyright notices. This artifact remains private in npm metadata to prevent accidental registry publication.\n\nBundled packages retain their own licenses and notices under \`node_modules/<package>/\`. DSH leaf packages additionally include the original DeepSeek root MIT license. Package manifests have exact versions and no install hooks. Studio JavaScript is bundled from the tested snapshot; its additional upstream notices are in dist/studio-licenses. Other executable JavaScript is preserved. The node-pty package includes the snapshot's existing JavaScript patch and ${target} N-API assets. Target native provenance is recorded in runtime-lock.json.\n\nSee \`runtime-lock.json\` for versions, file counts, and content hashes. These hashes record the produced artifact; they are not publisher signatures.\n`);
   // Force explicit target assets instead of silently shipping incomplete optional dependencies.
-  for (const name of platform==='win32'?['@img/sharp-win32-x64','@koromix/koffi-win32-x64','@vscode/ripgrep-win32-x64']:['@img/sharp-linux-x64','@img/sharp-libvips-linux-x64','@koromix/koffi-linux-x64','@vscode/ripgrep-linux-x64']) assert.ok(packages.has(name), `Missing target asset ${name}`);
-  for (const asset of platform === 'win32' ? ['node_modules/node-pty/prebuilds/win32-x64/pty.node'] : ['node_modules/node-pty/build/Release/pty.node']) assert.ok((await lstat(path.join(stage, asset))).isFile(), `Missing PTY asset ${asset}`);
+  for (const name of nativePackageNames(target)) assert.ok(packages.has(name), `Missing target asset ${name}`);
+  for (const file of ptyFiles(target)) {
+    const asset = `node_modules/node-pty/${file}`;
+    const stat = await lstat(path.join(stage, asset));
+    assert.ok(stat.isFile(), `Missing PTY asset ${asset}`);
+    if (file.endsWith('spawn-helper')) assert.ok(stat.mode & 0o111, 'macOS PTY spawn-helper must be executable');
+  }
   await filesIn(stage);
   await mkdir(output, { recursive: true });
   const packed = await execute(process.execPath, [npmCli, 'pack', '--ignore-scripts', '--json', '--pack-destination', temporary], {
