@@ -134,9 +134,13 @@ export class BridgeClient {
       workspaceRoot: input.workspaceRoot,
       permissions: input.permissions,
     };
+    // Authorization shares the worker with tool and extension setup. Allow a
+    // bounded IPC delay on slower hosts without extending the caller's task.
+    const authorizationTimeoutMs = Math.min(10_000, (input.expiresAt ?? Infinity) - Date.now());
+    if (authorizationTimeoutMs <= 0) throw new BridgeError('AUTHORIZATION_EXPIRED', 'The requested task authorization has expired');
     const grant = await this.request<CallGrant>('authorize', {
       ...scope, expectedGeneration: input.expectedGeneration, expiresAt: input.expiresAt,
-    }, 3_000);
+    }, authorizationTimeoutMs);
     if (input.onProgress) this.progress.set(input.callId, input.onProgress);
     try {
       input.signal?.throwIfAborted();
