@@ -6,7 +6,9 @@ import test from 'node:test';
 import { protectDirectory } from '../src/platform-support.mjs';
 import { setTestPermissions } from './file-permissions.js';
 import { executionEnvironment } from '../src/environment.js';
+import { serveControl } from '../src/control.js';
 import { readLocal, setupLocal, statusLocal, stopLocal, validateLocalBoundary } from '../src/local.js';
+import { BridgeError } from '../src/types.js';
 
 async function fixture(t: test.TestContext) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'bridge-local-test-')));
@@ -75,6 +77,52 @@ test('component environments retain OS execution settings but exclude provider s
     DEEPSEEK_API_KEY: 'private', OPENAI_API_KEY: 'private', ANTHROPIC_API_KEY: 'private',
     OPENCLAW_GATEWAY_TOKEN: 'private', NODE_OPTIONS: '--require unsafe-loader', NODE_PATH: '/outside', CUSTOM_SECRET: 'private' });
   assert.deepEqual(env, { PATH: '/usr/bin', HOME: '/safe/home', LC_ALL: 'C' });
+});
+
+for (const phase of ['initial status', 'stop response', 'shutdown status'] as const) {
+  test(`local stop confirms shutdown after a disconnected ${phase}`, async t => {
+    const f = await fixture(t);
+    const profile = await setupLocal(f.state, f);
+    let stopRequests = 0;
+    let statusRequests = 0;
+    let shutdown: Promise<void> | undefined;
+    const close = await serveControl(profile.file, async method => {
+      if (method === 'manage') stopRequests++;
+      else statusRequests++;
+      if ((phase === 'initial status' && statusRequests === 1)
+        || (phase === 'stop response' && method === 'manage')
+        || (phase === 'shutdown status' && method === 'status' && stopRequests > 0)) {
+        shutdown = close();
+        await shutdown;
+      }
+      return { state: stopRequests ? 'stopping' : 'ready' };
+    });
+    try {
+      assert.equal((await stopLocal(profile)).state, 'stopped');
+      assert.equal(stopRequests, phase === 'initial status' ? 0 : 1);
+      assert.equal(statusRequests, phase === 'shutdown status' ? 2 : 1);
+    } finally { await (shutdown ?? close()); }
+  });
+}
+
+test('local stop preserves management failures and does not treat disconnection as confirmed shutdown', async t => {
+  for (const deny of [true, false]) {
+    const f = await fixture(t);
+    const profile = await setupLocal(f.state, f);
+    let stopRequests = 0;
+    const close = await serveControl(profile.file, async method => {
+      if (method === 'manage') {
+        stopRequests++;
+        throw new BridgeError(deny ? 'METHOD_DENIED' : 'CONTROL_DISCONNECTED', 'Synthetic failure');
+      }
+      if (stopRequests) throw new BridgeError('STILL_RUNNING', 'The supervisor remains reachable');
+      return { state: 'ready' };
+    });
+    try {
+      await assert.rejects(stopLocal(profile), { code: deny ? 'METHOD_DENIED' : 'STILL_RUNNING' });
+      assert.equal(stopRequests, 1);
+    } finally { await close(); }
+  }
 });
 
 test('local credentials cannot be routed by edited host configuration and stop remains available', async t => {

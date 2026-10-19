@@ -285,12 +285,21 @@ export async function startLocal(profile: LocalProfile): Promise<LocalStatus> {
 }
 
 export async function stopLocal(profile: LocalProfile): Promise<LocalStatus> {
-  const before = await statusLocal(profile);
-  if (before.state === 'stopped') return before;
-  await controlRequest(profile.file, 'manage', { action: 'stop' });
+  let stopRequested = false;
   for (let i = 0; i < 150; i++) {
-    const status = await statusLocal(profile);
-    if (status.state === 'stopped') return status;
+    try {
+      const status = await statusLocal(profile);
+      if (status.state === 'stopped') return status;
+      if (!stopRequested) {
+        stopRequested = true;
+        await controlRequest(profile.file, 'manage', { action: 'stop' });
+      }
+    } catch (error) {
+      // Closing the supervisor can cut off its stop reply or a concurrent
+      // status request. Confirm that the listener is gone before succeeding;
+      // never replay the management request after losing its response.
+      if (!(error instanceof BridgeError) || error.code !== 'CONTROL_DISCONNECTED') throw error;
+    }
     await pause(100);
   }
   throw new BridgeError('LOCAL_STOP_TIMEOUT', 'The owned supervisor has not confirmed shutdown; no unrelated process was signalled');
