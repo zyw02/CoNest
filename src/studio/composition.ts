@@ -113,7 +113,7 @@ export async function startComposition(options: CompositionOptions): Promise<Run
 
     // Real DSH filesystem stack: provider + read-before-edit policy + model tools.
     fibers.push(await settleFiber(context.plugin(SandboxedFileSystem, { cwd: workspaceRoot })));
-    await mountWorkingDirectory(context, workspaceRoot);
+    fibers.push(...await mountWorkingDirectory(context, workspaceRoot));
     fibers.push(await settleFiber(context.plugin(FsObservationPolicy)));
     fibers.push(await settleFiber(context.plugin(selectFsTools("gateway"), {})));
 

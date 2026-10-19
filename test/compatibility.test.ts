@@ -8,6 +8,10 @@ import { SessionId, sessionEventsSince } from '../src/adapters/dsh-session.js';
 import { startComposition } from '../src/studio/composition.js';
 import { BridgeClient } from '../src/client.js';
 import type { AgentRunResult } from '../src/studio/cordis-bridge-host.js';
+import { Context, settleFiber } from '../src/adapters/dsh-cordis.js';
+import { ToolFs } from '../src/adapters/dsh-filesystem.js';
+import { SystemPrompt } from '../src/adapters/dsh-search.js';
+import { mountWorkingDirectory } from '../src/adapters/dsh-working-directory.js';
 import { fixture } from './helpers.js';
 import {
   CORDIS_COMPATIBILITY_RANGE,
@@ -91,6 +95,23 @@ test('real JSONL persistence survives composition teardown and cold Agent resume
       await resumed.dispose();
     } finally { await running.dispose(); }
   } finally { await client.stop(); }
+});
+
+test('working-directory services are released on composition disposal and partial activation failure', async t => {
+  const { workspace } = await fixture(t);
+  const required = ToolFs.inject.includes('workingDirectory');
+  const running = await startComposition({ workspaceRoot: await realpath(workspace) });
+  try { assert.equal(!!running.context.get('workingDirectory'), required); }
+  finally { await running.dispose(); }
+  assert.equal(running.context.get('workingDirectory'), undefined);
+
+  const context = new Context();
+  const prompt = await settleFiber(context.plugin(SystemPrompt, {}));
+  try {
+    if (required) await assert.rejects(mountWorkingDirectory(context, 'relative-directory'), /defaultDirectory must be absolute/);
+    else assert.deepEqual(await mountWorkingDirectory(context, 'relative-directory'), []);
+    for (const service of ['workingDirectory', 'sessionProjections', 'fs']) assert.equal(context.get(service), undefined);
+  } finally { await prompt.dispose(); }
 });
 
 test('keeps published compatibility metadata aligned with package discovery metadata', async () => {
