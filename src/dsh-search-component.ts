@@ -7,6 +7,7 @@ import type { Agent } from './adapters/dsh-agent.js';
 import { settleFiber, type CordisContext as Context } from './adapters/dsh-cordis.js';
 import { createDetachedSession, SessionId } from './adapters/dsh-session.js';
 import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
+import { mountWorkingDirectory } from './adapters/dsh-working-directory.js';
 import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { inside } from './config.js';
@@ -83,6 +84,7 @@ export async function startSearchInfrastructure(ctx: Context): Promise<void> {
   await startFiber(ctx, SystemPrompt, {});
   await startFiber(ctx, ToolRuntime, { mode: 'native' });
   await startFiber(ctx, LocalSubprocessRuntime, {});
+  await mountWorkingDirectory(ctx);
 }
 
 type SearchMatch = { path: string; lineNumber: number; line: string };

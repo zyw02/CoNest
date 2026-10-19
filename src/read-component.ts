@@ -3,6 +3,7 @@ import { LocalFileSystem } from './adapters/dsh-filesystem.js';
 import { settleFiber, type CordisContext } from './adapters/dsh-cordis.js';
 import { SystemPrompt } from './adapters/dsh-search.js';
 import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
+import { mountWorkingDirectory } from './adapters/dsh-working-directory.js';
 import { selectFsTools } from './fs-tool-subset.js';
 import { BridgeError, type ComponentModule } from './types.js';
 import type { ManagedReadResult, ReadObservation } from './read-contract.js';
@@ -13,6 +14,7 @@ export const dshReadComponent: ComponentModule<CordisContext> = {
     await settleFiber(ctx.plugin(SystemPrompt, {}));
     await settleFiber(ctx.plugin(ToolRuntime, { mode: 'native' }));
     await settleFiber(ctx.plugin(LocalFileSystem, {}));
+    await mountWorkingDirectory(ctx);
     await settleFiber(ctx.plugin(selectFsTools('reader'), {}));
     await ctx.inject(['bridgeCapabilities', 'fs', 'tools'], ctx => {
       const observed = new AsyncLocalStorage<{ receipt?: ReadObservation }>();

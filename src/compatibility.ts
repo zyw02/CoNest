@@ -6,10 +6,10 @@ export const OPENCLAW_TESTED_VERSIONS = [
   '2026.8.1', '2026.8.2', '2026.9.1', '2026.9.2', '2026.9.3', '2026.9.4', '2026.9.5', '2026.9.6'
 ] as const;
 export const OPENCLAW_COMPATIBILITY_RANGE = '>=2026.7.1-0 <2027.0.0';
-export const DSH_TESTED_VERSIONS = ['0.1.0-rc.5', '0.1.0-rc.7', '0.1.0-rc.8', '0.1.6-alpha.2'] as const;
+export const DSH_TESTED_VERSIONS = ['0.1.0-rc.5', '0.1.0-rc.7', '0.1.0-rc.8', '0.1.6-alpha.2', '0.2.1-rc.2'] as const;
 export const DSH_TESTED_VERSION = DSH_TESTED_VERSIONS[0];
-export const DSH_COMPATIBILITY_RANGE = '0.1.0-rc.5 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.6-alpha.2';
-export const CORDIS_COMPATIBILITY_RANGE = '4.0.1 || 4.0.2';
+export const DSH_COMPATIBILITY_RANGE = '0.1.0-rc.5 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.6-alpha.2 || 0.2.1-rc.2';
+export const CORDIS_COMPATIBILITY_RANGE = '4.0.1 || 4.0.2 || 4.0.5';
 
 export type Compatibility = {
   name: 'OpenClaw' | 'DSH' | 'Cordis';

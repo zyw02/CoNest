@@ -20,6 +20,7 @@ import { LlmRuntime } from "../adapters/dsh-llm.js";
 import { LocalSubprocessRuntime, SystemPrompt } from "../adapters/dsh-search.js";
 import { SessionStore } from "../adapters/dsh-session.js";
 import { ToolRuntime } from "../adapters/dsh-tools.js";
+import { mountWorkingDirectory } from "../adapters/dsh-working-directory.js";
 import { selectFsTools } from "../fs-tool-subset.js";
 import path from "node:path";
 import { registerBridgeProofAdapter } from "./proof-llm-adapter.js";
@@ -112,6 +113,7 @@ export async function startComposition(options: CompositionOptions): Promise<Run
 
     // Real DSH filesystem stack: provider + read-before-edit policy + model tools.
     fibers.push(await settleFiber(context.plugin(SandboxedFileSystem, { cwd: workspaceRoot })));
+    await mountWorkingDirectory(context, workspaceRoot);
     fibers.push(await settleFiber(context.plugin(FsObservationPolicy)));
     fibers.push(await settleFiber(context.plugin(selectFsTools("gateway"), {})));
 

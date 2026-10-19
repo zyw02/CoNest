@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { openClawApiVersion, openClawContractForVersion, supportsGatewayRuntimePatch, usesLegacyAgentList } from '../src/adapters/openclaw-version.js';
+import { SessionId, sessionEventsSince } from '../src/adapters/dsh-session.js';
+import { startComposition } from '../src/studio/composition.js';
+import { BridgeClient } from '../src/client.js';
+import type { AgentRunResult } from '../src/studio/cordis-bridge-host.js';
+import { fixture } from './helpers.js';
 import {
+  CORDIS_COMPATIBILITY_RANGE,
   DSH_COMPATIBILITY_RANGE,
   DSH_TESTED_VERSION,
   DSH_TESTED_VERSIONS,
@@ -49,8 +56,41 @@ test('handles prerelease DSH versions with an explicit adapter range', () => {
   assert.equal(inspectDsh('0.1.0-rc.7').tested, true);
   assert.equal(inspectDsh('0.1.0-rc.8').tested, true);
   assert.equal(inspectDsh('0.1.6-alpha.2').tested, true);
+  assert.equal(inspectDsh('0.2.1-rc.2').tested, true);
+  assert.equal(inspectCompatibility('Cordis', '4.0.5', CORDIS_COMPATIBILITY_RANGE, ['4.0.5']).tested, true);
   assert.throws(() => inspectDsh('0.1.5-rc.2'), /outside/);
   assert.throws(() => inspectCompatibility('DSH', '0.2.0', DSH_COMPATIBILITY_RANGE, []), /outside/);
+});
+
+test('real JSONL persistence survives composition teardown and cold Agent resume', async t => {
+  const f = await fixture(t);
+  const workspaceRoot = await realpath(f.workspace);
+  const options = { workspaceRoot, sessionPersistenceRoot: path.join(f.root, 'sessions'), enableBridgeProofAdapter: true };
+  const agentOptions = { provider: 'bridge-proof', model: 'test', maxTokens: 256 };
+  const client = new BridgeClient({ workerFile: fileURLToPath(new URL('../dist/worker.js', import.meta.url)),
+    workspaceRoot, startupTimeoutMs: 15_000, shutdownTimeoutMs: 5_000 });
+  const turn = (marker: string) => client.extension<AgentRunResult>({ operation: 'runHarnessAgent', setup: options,
+    args: { task: `PROOF:IMAGE:${marker}`, sessionKey: 'persistence-compatibility', provider: 'bridge-proof', model: 'test', timeoutMs: 10_000 },
+    callbacks: { event() {} } });
+  try {
+    await client.start();
+    const first = await turn('persisted-first-turn');
+    assert.match(first.finalText, /DSH_IMAGE_INPUT_MISSING/);
+    await client.stop();
+    await client.start();
+    const second = await turn('persisted-second-turn');
+    assert.equal(second.sessionId, first.sessionId);
+    assert.match(second.finalText, /DSH_IMAGE_INPUT_MISSING/);
+    await client.stop();
+    const running = await startComposition(options);
+    try {
+      const resumed = await running.context.agents.resume({ resumeSessionId: SessionId(first.sessionId), agentOptions });
+      const history = JSON.stringify(sessionEventsSince(resumed.agent.session, 0));
+      assert.ok(history.includes('persisted-first-turn'));
+      assert.ok(history.includes('persisted-second-turn'));
+      await resumed.dispose();
+    } finally { await running.dispose(); }
+  } finally { await client.stop(); }
 });
 
 test('keeps published compatibility metadata aligned with package discovery metadata', async () => {
@@ -61,6 +101,7 @@ test('keeps published compatibility metadata aligned with package discovery meta
   assert.equal(pkg.openclaw.compat.pluginApi, OPENCLAW_COMPATIBILITY_RANGE);
   assert.equal(pkg.openclaw.compat.minGatewayVersion, `${compatibility.adapters.openclaw.minimum}-0`);
   assert.equal(compatibility.adapters.dsh.supported, DSH_COMPATIBILITY_RANGE);
+  assert.equal(compatibility.adapters.dsh.cordis, CORDIS_COMPATIBILITY_RANGE);
   assert.deepEqual(compatibility.adapters.openclaw.tested, [...OPENCLAW_TESTED_VERSIONS]);
   assert.deepEqual(compatibility.adapters.dsh.tested, [...DSH_TESTED_VERSIONS]);
   assert.deepEqual(compatibility.adapters.dsh.qualifications.map((entry: { version: string }) => entry.version), [...DSH_TESTED_VERSIONS]);
