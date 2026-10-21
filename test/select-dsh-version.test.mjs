@@ -30,6 +30,27 @@ test('replaces frozen DSH paths with exact packages from one upstream revision',
   assert.equal(result.selected.length, 3);
 });
 
+test('selects the matching working-directory runtime provider when a public DSH release has it', async () => {
+  const input = {
+    dependencies: { '@deepseek-ai/dsh-tools': 'file:.vendor/dsh/packages/core/tools' },
+    devDependencies: { '@deepseek-ai/dsh-agent': 'file:.vendor/dsh/packages/core/agent' },
+  };
+  const required = new Set(['@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-agent', '@deepseek-ai/dsh-working-directory']);
+  const loadManifest = async () => { throw new Error('No non-DSH manifest expected'); };
+  const available = async (name, version) => {
+    assert.equal(name, '@deepseek-ai/dsh-working-directory');
+    assert.equal(version, '0.1.6-alpha.2');
+    return true;
+  };
+  const selected = await selectDshPackages(input, '0.1.6-alpha.2', revision, loadManifest, required, available);
+  assert.equal(selected.manifest.dependencies['@deepseek-ai/dsh-working-directory'], '0.1.6-alpha.2');
+  assert.ok(selected.selected.some(entry => entry.group === 'dependencies' && entry.name === '@deepseek-ai/dsh-working-directory'));
+  assert.equal(input.dependencies['@deepseek-ai/dsh-working-directory'], undefined);
+
+  const unavailable = await selectDshPackages(input, '0.1.6-alpha.2', revision, loadManifest, required, async () => false);
+  assert.equal(unavailable.manifest.dependencies['@deepseek-ai/dsh-working-directory'], undefined);
+});
+
 test('removes frozen overrides and enables peer installation for public packages', () => {
   const source = `packages: []
 

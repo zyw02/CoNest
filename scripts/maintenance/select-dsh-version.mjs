@@ -7,11 +7,19 @@ const DSH_SOURCE_PREFIX = 'file:.vendor/dsh/';
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const REVISION_PATTERN = /^[0-9a-f]{40}$/;
 
-export async function selectDshPackages(manifest, version, revision, loadManifest, requiredNames) {
+export async function selectDshPackages(manifest, version, revision, loadManifest, requiredNames, hasPublishedPackage = async () => false) {
   if (!VERSION_PATTERN.test(version)) throw new Error(`Invalid DSH version: ${version}`);
   if (!REVISION_PATTERN.test(revision)) throw new Error(`DSH revision must be a full commit SHA: ${revision}`);
   const selected = [];
   const output = structuredClone(manifest);
+  // The frozen rc.5 SDK predates this service. Public tool releases that
+  // publish it need a direct runtime dependency for clean installs and packs.
+  const workingDirectory = '@deepseek-ai/dsh-working-directory';
+  if (requiredNames.has(workingDirectory) && await hasPublishedPackage(workingDirectory, version)) {
+    output.dependencies ??= {};
+    output.dependencies[workingDirectory] = version;
+    selected.push({ group: 'dependencies', name: workingDirectory, version, source: 'registry' });
+  }
   for (const group of ['dependencies', 'devDependencies']) {
     for (const [name, specifier] of Object.entries(output[group] ?? {})) {
       if (typeof specifier !== 'string' || !specifier.startsWith(DSH_SOURCE_PREFIX)) continue;
@@ -101,7 +109,17 @@ async function main() {
     throw new Error(`DSH revision ${revision} identifies ${release.name}@${release.version}, expected @deepseek-ai/dsh-root@${version}`);
   }
   const requiredNames = await discoverDirectPackages(root);
-  const result = await selectDshPackages(manifest, version, revision, loadManifest, requiredNames);
+  const hasPublishedPackage = async (name, selectedVersion) => {
+    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(selectedVersion)}`, {
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (response.status === 404) return false;
+    if (!response.ok) throw new Error(`Unable to inspect DSH package ${name}@${selectedVersion}: HTTP ${response.status}`);
+    const pkg = await response.json();
+    if (pkg.name !== name || pkg.version !== selectedVersion) throw new Error(`DSH package identity mismatch: ${name}@${selectedVersion}`);
+    return true;
+  };
+  const result = await selectDshPackages(manifest, version, revision, loadManifest, requiredNames, hasPublishedPackage);
   await writeFile(packageFile, JSON.stringify(result.manifest, null, 2) + '\n');
   await writeFile(workspaceFile, selectDshWorkspace(
     await readFile(workspaceFile, 'utf8'),
