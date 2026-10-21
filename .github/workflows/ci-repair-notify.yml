@@ -1,0 +1,110 @@
+name: CI repair notification
+
+on:
+  workflow_run:
+    workflows: [Build and test, Agent compatibility, Windows integration, macOS integration, CoNest Review, Contribution requirements]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-repair-notify-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    if: vars.CONEST_CI_REPAIR_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      # Metadata only: never check out a PR or consume its artifacts here.
+      # Publish and verify the external agent's model/effort before enabling.
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          NODE_USE_ENV_PROXY: '1'
+          AGENT_TRIGGER_ID: ${{ vars.CONEST_WORKSPACE_AGENT_TRIGGER_ID }}
+          AGENT_ACCESS_TOKEN: ${{ secrets.CONEST_WORKSPACE_AGENT_TOKEN }}
+          EXCLUDED_PR_AUTHOR: zyw02
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const event = context.payload.workflow_run;
+            const skip = reason => core.info(`No notification: ${reason}`);
+            const failures = new Set(['failure', 'timed_out', 'action_required', 'startup_failure']);
+            if (!failures.has(event.conclusion) && event.conclusion !== 'success') return skip('non-actionable conclusion');
+            const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: event.id });
+            if (run.status !== 'completed' || run.run_attempt !== event.run_attempt || run.conclusion !== event.conclusion) return skip('superseded attempt');
+            const latest = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner, repo, workflow_id: run.workflow_id, head_sha: run.head_sha,
+              branch: run.head_branch, event: run.event, per_page: 100,
+            });
+            const newer = latest.some(other => other.head_sha === run.head_sha &&
+              other.head_repository?.full_name === run.head_repository?.full_name &&
+              (Date.parse(other.created_at) > Date.parse(run.created_at) ||
+                (other.created_at === run.created_at && other.id > run.id)));
+            if (newer) return skip('newer run exists');
+            const baseline = ['main', 'develop'].includes(run.head_branch) &&
+              ['push', 'schedule', 'workflow_dispatch'].includes(run.event) &&
+              run.head_repository?.full_name === `${owner}/${repo}`;
+            let prs = [];
+            if (baseline) {
+              const { data: ref } = await github.rest.git.getRef({ owner, repo, ref: `heads/${run.head_branch}` });
+              if (ref.object.sha !== run.head_sha) return skip('obsolete branch head');
+            } else {
+              const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+                owner, repo, commit_sha: run.head_sha, per_page: 100,
+              });
+              const numbers = [...new Set([...(run.pull_requests || []).map(pr => pr.number), ...associated.map(pr => pr.number)])];
+              for (const number of numbers) {
+                const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+                if (pr.state !== 'open') continue;
+                if (pr.head.sha !== run.head_sha) {
+                  if (pr.merge_commit_sha !== run.head_sha) continue;
+                  const { data: merge } = await github.rest.git.getCommit({ owner, repo, commit_sha: run.head_sha });
+                  if (!merge.parents.some(parent => parent.sha === pr.head.sha)) continue;
+                }
+                prs.push(pr);
+              }
+              if (!prs.length) {
+                if (['pull_request', 'pull_request_target'].includes(run.event) && !numbers.length) throw new Error('Unable to resolve PR provenance');
+                return skip('no current open PR');
+              }
+              // This label is an explicit registry entry set on agent-created repair PRs.
+              // It must not be inferred from a PR title, branch, or author account.
+              prs = prs.filter(pr => pr.labels.some(label => label.name === 'conest:ci-repair') ||
+                pr.user.login.toLowerCase() !== process.env.EXCLUDED_PR_AUTHOR.toLowerCase());
+              if (!prs.length) return skip('manually created owner PR');
+            }
+            const managed = prs.filter(pr => pr.labels.some(label => label.name === 'conest:ci-repair'));
+            if (run.conclusion === 'success' && !managed.length) return skip('ordinary successful CI');
+            const trigger = process.env.AGENT_TRIGGER_ID || '';
+            if (!/^agtch_[A-Za-z0-9_-]+$/.test(trigger) || !process.env.AGENT_ACCESS_TOKEN) {
+              throw new Error('Workspace Agent API channel or access token is not configured');
+            }
+            const input = {
+              type: 'conest.ci.completed', repository: `${owner}/${repo}`,
+              run_id: run.id, run_attempt: run.run_attempt, workflow_id: run.workflow_id,
+              head_sha: run.head_sha, branch: run.head_branch, source_event: run.event,
+              conclusion: run.conclusion, run_url: `https://github.com/${owner}/${repo}/actions/runs/${run.id}`,
+              pull_requests: prs.map(pr => ({ number: pr.number, head_sha: pr.head.sha,
+                author: pr.user.login, automation_managed: managed.some(item => item.number === pr.number) })),
+            };
+            const response = await fetch(`https://api.chatgpt.com/v1/workspace_agents/${trigger}/trigger`, {
+              method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
+              headers: {
+                Authorization: `Bearer ${process.env.AGENT_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json', 'OpenAI-Beta': 'workspace_agent_runs=v1',
+                'Idempotency-Key': `conest-ci:${owner}/${repo}:${run.id}:${run.run_attempt}`,
+              },
+              body: JSON.stringify({ conversation_key: `conest-ci:${owner}/${repo}`,
+                input: JSON.stringify(input) }),
+            });
+            if (response.status !== 202) throw new Error(`Workspace Agent trigger returned HTTP ${response.status}`);
+            const receipt = await response.json().catch(() => null);
+            const runId = receipt?.agent_trigger_run_id;
+            if (/^apirun_[A-Za-z0-9_-]+$/.test(runId || '')) core.info(`Cloud trigger run: ${runId}`);
+            core.info(`Cloud trigger accepted for run ${run.id}, attempt ${run.run_attempt}; execution is not yet verified.`);
+            await core.summary.addRaw(`Cloud trigger accepted for [CI run ${run.id}](${input.run_url}). Agent execution, model and repair outcome require separate evidence.\n`).write();
