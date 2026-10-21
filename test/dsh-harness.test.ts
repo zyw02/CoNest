@@ -1,3 +1,4 @@
+import { sessionToolResults, type SessionEvent } from '../src/adapters/dsh-session.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AnyAgentTool } from 'openclaw/plugin-sdk/plugin-entry';
@@ -77,4 +78,15 @@ test('DSH forwards host cancellation to actual tool work and rejects results aft
   })], async tools => { await tools[0]!.execute('active', {}); });
   assert.equal(terminal(await expired.run()), 'failed');
   assert.deepEqual(expired.ended, ['run']);
+});
+
+test('both session result contracts preserve failures and ignore surrounding commentary', () => {
+  const outcome = { toolCallId: 'call', content: [{ type: 'text', text: 'denied' }], isError: true };
+  for (const message of [
+    { role: 'user', content: [{ type: 'text', text: 'commentary' }, { type: 'tool-result', ...outcome }] },
+    { role: 'tool', ...outcome },
+  ]) {
+    const event = { type: 'tool/result', data: { message } };
+    assert.deepEqual(sessionToolResults(event as unknown as Extract<SessionEvent, { type: 'tool/result' }>), [outcome]);
+  }
 });

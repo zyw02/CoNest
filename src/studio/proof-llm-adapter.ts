@@ -91,7 +91,9 @@ export class BridgeProofAdapter extends LlmAdapter {
       Boolean(block) && typeof block === "object" && (block as { type?: unknown }).type === "image");
     const toolResult = [...messages]
       .reverse()
-      .flatMap((message) => message.content)
+      .flatMap((message) => message.role === "tool"
+        ? [{ type: "tool-result", content: message.content }]
+        : message.content)
       .find((block) =>
         Boolean(block) && typeof block === "object" && (block as { type?: unknown }).type === "tool-result");
 

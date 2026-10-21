@@ -15,11 +15,12 @@ import {
 } from "../adapters/dsh-composition.js";
 import { AgentRegistry } from "../adapters/dsh-agent.js";
 import { ApprovalService } from "../adapters/dsh-approval.js";
-import { Context, type Fiber } from "../adapters/dsh-cordis.js";
+import { settleFiber, Context, type Fiber } from "../adapters/dsh-cordis.js";
 import { LlmRuntime } from "../adapters/dsh-llm.js";
 import { LocalSubprocessRuntime, SystemPrompt } from "../adapters/dsh-search.js";
 import { SessionStore } from "../adapters/dsh-session.js";
 import { ToolRuntime } from "../adapters/dsh-tools.js";
+import { mountWorkingDirectory } from "../adapters/dsh-working-directory.js";
 import { selectFsTools } from "../fs-tool-subset.js";
 import path from "node:path";
 import { registerBridgeProofAdapter } from "./proof-llm-adapter.js";
@@ -43,16 +44,16 @@ export async function startComposition(options: CompositionOptions): Promise<Run
   const workspaceRoot = path.resolve(options.workspaceRoot);
 
   try {
-    fibers.push(await context.plugin(LlmRuntime));
-    fibers.push(await context.plugin(SessionStore));
-    fibers.push(await context.plugin(SessionProjectionRegistry));
-    fibers.push(await context.plugin(LocalAttachmentStore, {
+    fibers.push(await settleFiber(context.plugin(LlmRuntime)));
+    fibers.push(await settleFiber(context.plugin(SessionStore)));
+    fibers.push(await settleFiber(context.plugin(SessionProjectionRegistry)));
+    fibers.push(await settleFiber(context.plugin(LocalAttachmentStore, {
       dshHome: path.join(workspaceRoot, ".dsh"),
-    }));
-    fibers.push(await context.plugin(SystemPrompt));
-    fibers.push(await context.plugin(ApprovalService, { policy: "ask" }));
-    fibers.push(await context.plugin(ToolRuntime, { mode: "native" }));
-    fibers.push(await context.plugin(AgentRegistry));
+    })));
+    fibers.push(await settleFiber(context.plugin(SystemPrompt)));
+    fibers.push(await settleFiber(context.plugin(ApprovalService, { policy: "ask" })));
+    fibers.push(await settleFiber(context.plugin(ToolRuntime, { mode: "native" })));
+    fibers.push(await settleFiber(context.plugin(AgentRegistry)));
 
     if (options.modelRoute) {
       const apiKey = options.modelRoute.apiKey;
@@ -60,7 +61,7 @@ export async function startComposition(options: CompositionOptions): Promise<Run
     }
     if (options.enableBridgeProofAdapter) registerBridgeProofAdapter(context);
     fibers.push(
-      await context.plugin(LlmPiAi, {
+      await settleFiber(context.plugin(LlmPiAi, {
         providers: {
           "deepseek-official": {
             displayName: "DeepSeek (OpenClaw route)",
@@ -99,51 +100,52 @@ export async function startComposition(options: CompositionOptions): Promise<Run
             ],
           },
         },
-      }),
+      })),
     );
 
     // One policy controls both the in-process filesystem fence and kernel-backed Bash sandbox.
     fibers.push(
-      await context.plugin(SandboxPolicyService, {
+      await settleFiber(context.plugin(SandboxPolicyService, {
         mode: "workspace-write",
         workspaceRoot,
-      }),
+      })),
     );
 
     // Real DSH filesystem stack: provider + read-before-edit policy + model tools.
-    fibers.push(await context.plugin(SandboxedFileSystem, { cwd: workspaceRoot }));
-    fibers.push(await context.plugin(FsObservationPolicy));
-    fibers.push(await context.plugin(selectFsTools("gateway"), {}));
+    fibers.push(await settleFiber(context.plugin(SandboxedFileSystem, { cwd: workspaceRoot })));
+    fibers.push(...await mountWorkingDirectory(context, workspaceRoot));
+    fibers.push(await settleFiber(context.plugin(FsObservationPolicy)));
+    fibers.push(await settleFiber(context.plugin(selectFsTools("gateway"), {})));
 
     // Subprocess infrastructure remains required by Bash. Search is owned by the worker.
-    fibers.push(await context.plugin(LocalSubprocessRuntime));
+    fibers.push(await settleFiber(context.plugin(LocalSubprocessRuntime)));
 
     // Real DSH shell stack. Background mode is disabled because this focused
     // composition intentionally does not mount the DSH jobs subsystem.
-    fibers.push(await context.plugin(LocalSandboxProvider, {}));
+    fibers.push(await settleFiber(context.plugin(LocalSandboxProvider, {})));
     fibers.push(
-      await context.plugin(SandboxBashExecutor, {
+      await settleFiber(context.plugin(SandboxBashExecutor, {
         cwd: workspaceRoot,
         timeoutMs: 30_000,
         maxTimeoutMs: 120_000,
-      }),
+      })),
     );
     fibers.push(
-      await context.plugin(ShellEnv, {
+      await settleFiber(context.plugin(ShellEnv, {
         dshHome: path.join(workspaceRoot, ".dsh"),
-      }),
+      })),
     );
-    fibers.push(await context.plugin(ToolBash, { enableRunInBackground: false }));
+    fibers.push(await settleFiber(context.plugin(ToolBash, { enableRunInBackground: false })));
     fibers.push(
-      await context.plugin(JsonlSessionPersistence, {
+      await settleFiber(context.plugin(JsonlSessionPersistence, {
         root: path.resolve(
           options.sessionPersistenceRoot ?? path.join(workspaceRoot, ".dsh", "sessions"),
         ),
         compression: "none",
-      }),
+      })),
     );
-    fibers.push(await context.plugin(SessionCheckpointPolicy));
-    fibers.push(await context.plugin(AgentLoop, { agents: [], maxParallelToolCalls: 4 }));
+    fibers.push(await settleFiber(context.plugin(SessionCheckpointPolicy)));
+    fibers.push(await settleFiber(context.plugin(AgentLoop, { agents: [], maxParallelToolCalls: 4 })));
   } catch (error) {
     await disposeFibers(fibers);
     throw error;

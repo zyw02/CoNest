@@ -1,5 +1,5 @@
-import { Context, type FiberState } from './adapters/dsh-cordis.js';
-import { Loader, type EntryOptions } from './adapters/dsh-loader.js';
+import { settleFiber, Context, type FiberState } from './adapters/dsh-cordis.js';
+import { Loader, removeLoaderEntry, type EntryOptions } from './adapters/dsh-loader.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
   CapabilityRegistry, componentService, dependencyState, resolveComponent, startFiber,
@@ -32,7 +32,7 @@ export class ComponentLoader {
 
   static async create(): Promise<ComponentLoader> {
     const engine = new ComponentLoader();
-    await engine.context.plugin(Loader);
+    await settleFiber(engine.context.plugin(Loader));
     // Cordis catches disposer exceptions. Observe the structured lifecycle evidence as well.
     engine.context.logger.exporter({ export(message) {
       if (message.type !== 'error' || message.fiber?.deref()?.state !== UNLOADING) return;
@@ -182,10 +182,12 @@ export class ComponentLoader {
       // Only create the candidate. Re-applying a copied root list could revive a
       // self-disabled accepted entry behind the graph owner's back.
       await this.context.loader.create(structuredClone(options));
+      const entry = this.context.loader.resolve(id);
+      if (entry.fiber) await settleFiber(entry.fiber);
       if (!this.ready(node)) throw new BridgeError('INVALID_COMPONENT', `Component ${spec.manifest.id} is pending or did not register all declared capabilities`);
       return node;
     } catch (error) {
-      await this.context.loader.root.remove(id);
+      await removeLoaderEntry(this.context.loader, id);
       delete this.context.loader.builtins[id];
       throw error;
     }
@@ -195,7 +197,7 @@ export class ComponentLoader {
     const failures: unknown[] = [];
     for (const node of [...nodes.values()].reverse()) {
       if (--node.owners > 0) continue;
-      try { await this.context.loader.root.remove(node.id); } catch (error) { failures.push(error); }
+      try { await removeLoaderEntry(this.context.loader, node.id); } catch (error) { failures.push(error); }
       delete this.context.loader.builtins[node.id];
     }
     if (failures.length) throw new AggregateError(failures, 'Component entry cleanup failed');

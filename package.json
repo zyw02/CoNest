@@ -65,7 +65,8 @@
     "@deepseek-ai/dsh-tool-fs": "file:.vendor/dsh/packages/fs/tool-fs",
     "@deepseek-ai/dsh-fs": "file:.vendor/dsh/packages/fs/fs",
     "@deepseek-ai/dsh-fs-local": "file:.vendor/dsh/packages/fs/fs-local",
-    "@deepseek-ai/dsh-mcp-client": "file:.vendor/dsh/packages/mcp/mcp-client"
+    "@deepseek-ai/dsh-mcp-client": "file:.vendor/dsh/packages/mcp/mcp-client",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "file:.vendor/dsh/packages/session/session-persistence-jsonl"
   },
   "devDependencies": {
     "@types/node": "22.20.0",
@@ -86,7 +87,6 @@
     "@deepseek-ai/dsh-sandbox-local": "file:.vendor/dsh/packages/sandbox/sandbox-local",
     "@deepseek-ai/dsh-sandbox-policy": "file:.vendor/dsh/packages/sandbox/sandbox-policy",
     "@deepseek-ai/dsh-session-checkpoint-policy": "file:.vendor/dsh/packages/session/session-checkpoint-policy",
-    "@deepseek-ai/dsh-session-persistence-jsonl": "file:.vendor/dsh/packages/session/session-persistence-jsonl",
     "@deepseek-ai/dsh-shell-env": "file:.vendor/dsh/packages/shell/shell-env",
     "@deepseek-ai/dsh-tool-bash": "file:.vendor/dsh/packages/shell/tool-bash",
     "@deepseek-ai/dsh-user-approval": "file:.vendor/dsh/packages/interaction/user-approval",

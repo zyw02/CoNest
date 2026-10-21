@@ -4,9 +4,10 @@ import {
   ToolFsSearch,
 } from './adapters/dsh-search.js';
 import type { Agent } from './adapters/dsh-agent.js';
-import type { CordisContext as Context } from './adapters/dsh-cordis.js';
+import { settleFiber, type CordisContext as Context } from './adapters/dsh-cordis.js';
 import { createDetachedSession, SessionId } from './adapters/dsh-session.js';
 import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
+import { mountWorkingDirectory } from './adapters/dsh-working-directory.js';
 import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { inside } from './config.js';
@@ -17,7 +18,7 @@ export const dshSearchComponent: ComponentModule<Context> = {
   name: 'dsh-search',
   inject: ['bridgeCapabilities', 'tools', 'systemPrompt', 'subprocess'],
   async apply(ctx) {
-    await ctx.plugin(ToolFsSearch, {
+    await settleFiber(ctx.plugin(ToolFsSearch, {
       sampleOverCapGlobResults: false,
       grepMaxMatches: 250,
       grepMaxLineBytes: 2_000,
@@ -26,7 +27,7 @@ export const dshSearchComponent: ComponentModule<Context> = {
       graceMs: 3_000,
       stderrMaxBytes: 65_536,
       timeoutMs: 30_000,
-    });
+    }));
     ctx.bridgeCapabilities.register(ctx, 'knowledge_search', async (args, invocation) => {
       const query = args.query as string;
       invocation.progress('Searching workspace sources');
@@ -83,6 +84,7 @@ export async function startSearchInfrastructure(ctx: Context): Promise<void> {
   await startFiber(ctx, SystemPrompt, {});
   await startFiber(ctx, ToolRuntime, { mode: 'native' });
   await startFiber(ctx, LocalSubprocessRuntime, {});
+  await mountWorkingDirectory(ctx);
 }
 
 type SearchMatch = { path: string; lineNumber: number; line: string };

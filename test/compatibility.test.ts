@@ -1,5 +1,15 @@
+import { fileURLToPath } from 'node:url';
+import { SessionId, sessionEventsSince } from '../src/adapters/dsh-session.js';
+import { startComposition } from '../src/studio/composition.js';
+import { BridgeClient } from '../src/client.js';
+import type { AgentRunResult } from '../src/studio/cordis-bridge-host.js';
+import { Context, settleFiber } from '../src/adapters/dsh-cordis.js';
+import { ToolFs } from '../src/adapters/dsh-filesystem.js';
+import { SystemPrompt } from '../src/adapters/dsh-search.js';
+import { mountWorkingDirectory } from '../src/adapters/dsh-working-directory.js';
+import { fixture } from './helpers.js';
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import {
@@ -58,4 +68,52 @@ test('keeps third-party Agent SDK imports inside adapter modules', async () => {
     }
   }
   assert.deepEqual(violations, []);
+});
+
+test('real JSONL persistence survives composition teardown and cold Agent resume', async t => {
+  const f = await fixture(t);
+  const workspaceRoot = await realpath(f.workspace);
+  const options = { workspaceRoot, sessionPersistenceRoot: path.join(f.root, 'sessions'), enableBridgeProofAdapter: true };
+  const agentOptions = { provider: 'bridge-proof', model: 'test', maxTokens: 256 };
+  const client = new BridgeClient({ workerFile: fileURLToPath(new URL('../dist/worker.js', import.meta.url)),
+    workspaceRoot, startupTimeoutMs: 15_000, shutdownTimeoutMs: 5_000 });
+  const turn = (marker: string) => client.extension<AgentRunResult>({ operation: 'runHarnessAgent', setup: options,
+    args: { task: `PROOF:IMAGE:${marker}`, sessionKey: 'persistence-compatibility', provider: 'bridge-proof', model: 'test', timeoutMs: 10_000 },
+    callbacks: { event() {} } });
+  try {
+    await client.start();
+    const first = await turn('persisted-first-turn');
+    assert.match(first.finalText, /DSH_IMAGE_INPUT_MISSING/);
+    await client.stop();
+    await client.start();
+    const second = await turn('persisted-second-turn');
+    assert.equal(second.sessionId, first.sessionId);
+    assert.match(second.finalText, /DSH_IMAGE_INPUT_MISSING/);
+    await client.stop();
+    const running = await startComposition(options);
+    try {
+      const resumed = await running.context.agents.resume({ resumeSessionId: SessionId(first.sessionId), agentOptions });
+      const history = JSON.stringify(sessionEventsSince(resumed.agent.session, 0));
+      assert.ok(history.includes('persisted-first-turn'));
+      assert.ok(history.includes('persisted-second-turn'));
+      await resumed.dispose();
+    } finally { await running.dispose(); }
+  } finally { await client.stop(); }
+});
+
+test('working-directory services are released on composition disposal and partial activation failure', async t => {
+  const { workspace } = await fixture(t);
+  const required = ToolFs.inject.includes('workingDirectory');
+  const running = await startComposition({ workspaceRoot: await realpath(workspace) });
+  try { assert.equal(!!running.context.get('workingDirectory'), required); }
+  finally { await running.dispose(); }
+  assert.equal(running.context.get('workingDirectory'), undefined);
+
+  const context = new Context();
+  const prompt = await settleFiber(context.plugin(SystemPrompt, {}));
+  try {
+    if (required) await assert.rejects(mountWorkingDirectory(context, 'relative-directory'), /defaultDirectory must be absolute/);
+    else assert.deepEqual(await mountWorkingDirectory(context, 'relative-directory'), []);
+    for (const service of ['workingDirectory', 'sessionProjections', 'fs']) assert.equal(context.get(service), undefined);
+  } finally { await prompt.dispose(); }
 });
