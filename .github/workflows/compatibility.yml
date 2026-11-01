@@ -79,7 +79,9 @@ jobs:
           latest_tag="$(gh api 'repos/deepseek-ai/deepseek-harness/releases?per_page=20' --jq '[.[] | select(.draft == false)][0].tag_name')"
           latest_version="${latest_tag#dsh-v}"
           latest_revision="$(gh api "repos/deepseek-ai/deepseek-harness/commits/${latest_tag}" --jq .sha)"
-          node -e 'const d=require("./compatibility.json").adapters.dsh; const latest={version:process.argv[1],source:"upstream-latest",revision:process.argv[2]}; const include=d.qualifications.some(x=>x.version===latest.version)?d.qualifications:[...d.qualifications,latest]; process.stdout.write(`matrix=${JSON.stringify({include})}\n`)' "$latest_version" "$latest_revision" >> "$GITHUB_OUTPUT"
+          # Retain the batch-executor regression even when a newer release uses
+          # the older API. This is test coverage, not a support-range expansion.
+          node -e 'const d=require("./compatibility.json").adapters.dsh; const candidates=[...d.qualifications,{version:"0.2.2-alpha.2",source:"upstream-regression",revision:"f3803c96974ad4a94195fb97e5c637e9c2a3afe3"},{version:process.argv[1],source:"upstream-latest",revision:process.argv[2]}]; const include=candidates.filter((x,i)=>candidates.findIndex(y=>y.version===x.version)===i); process.stdout.write(`matrix=${JSON.stringify({include})}\n`)' "$latest_version" "$latest_revision" >> "$GITHUB_OUTPUT"
   dsh:
     needs: dsh-versions
     name: dsh (${{ matrix.version }} / ${{ matrix.source }})

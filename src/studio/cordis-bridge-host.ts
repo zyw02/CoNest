@@ -3,7 +3,7 @@ import type { Agent, AgentHandle } from "../adapters/dsh-agent.js";
 import type { ApprovalOutcome, ApprovalRequest } from "../adapters/dsh-approval.js";
 import { createUserMessage, type ContentBlock } from "../adapters/dsh-llm.js";
 import { Session, SessionId, sessionEventsSince, sessionToolResults, type SessionEvent } from "../adapters/dsh-session.js";
-import { ToolCallId, type ToolExecutionResult } from "../adapters/dsh-tools.js";
+import { executeTool, ToolCallId, type ToolExecutionResult } from "../adapters/dsh-tools.js";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -155,7 +155,7 @@ export class CordisBridgeHost {
     if (this.state !== "ready" || !this.composition) {
       throw new Error(`Cordis bridge is ${this.state}; the OpenClaw plugin service is not ready`);
     }
-    return this.composition.context.tools.execute({
+    return executeTool(this.composition.context.tools, {
       callId: ToolCallId(toolCallId),
       name,
       arguments: params,
