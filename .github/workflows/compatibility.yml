@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# Matrix selectors deliberately install a graph different from the frozen lock.
+# Do not let pnpm run/exec replace it with the baseline before testing it.
+env:
+  pnpm_config_verify_deps_before_run: 'false'
+
 jobs:
   openclaw-versions:
     runs-on: ubuntu-24.04
@@ -53,6 +58,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build once against the frozen SDK
         run: pnpm build
+      - name: Use the current Node 24 patch for newer runtime hosts
+        if: matrix.version != '2026.9.2'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          check-latest: true
       - name: Select the actual runtime host without changing build pins
         run: node scripts/maintenance/select-openclaw-version.mjs "${{ matrix.version }}"
       - name: Verify adapters, activation and real Gateway execution
