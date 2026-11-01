@@ -28,8 +28,8 @@ test('call grants reject identity changes, replay, revocation, expiry, and stale
     await runtime.reload(resolveConfig({ workspaceRoot: workspace, maxConcurrent: 2 }));
     await assert.rejects(runtime.invoke({ ...input, authorization: stale.token }), hasCode('STALE_GENERATION'));
     assert.throws(() => runtime.authorize({ ...input, expectedGeneration: stale.generation }), hasCode('STALE_GENERATION'));
-    const expires = runtime.authorize({ ...input, expiresAt: Date.now() + 20 });
-    await new Promise(resolve => setTimeout(resolve, 30));
+    const expires = runtime.authorize({ ...input, expiresAt: Date.now() + 1_000 });
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, expires.expiresAt - Date.now() + 10)));
     await assert.rejects(runtime.invoke({ ...input, authorization: expires.token }), hasCode('AUTHORIZATION_INVALID'));
     assert.equal(runtime.status().tasks, 0);
     assert.equal(runtime.status().grants, 0);
