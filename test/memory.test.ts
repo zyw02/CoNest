@@ -6,6 +6,10 @@ import test from 'node:test';
 import { BridgeClient } from '../src/client.js';
 import { resolveConfig } from '../src/config.js';
 import { createMemoryAccess } from '../src/memory-adapter.js';
+import { BridgeRuntime } from '../src/runtime.js';
+import { Context, settleFiber } from '../src/adapters/dsh-cordis.js';
+import { SystemPrompt } from '../src/adapters/dsh-search.js';
+import { ToolRuntime } from '../src/adapters/dsh-tools.js';
 import { ALL_PERMISSIONS, type Principal, type Permission } from '../src/types.js';
 import { resolveAutomaticMemorySubject } from '../src/studio/automatic-memory.js';
 import { fixture, request, hasCode } from './helpers.js';
@@ -24,6 +28,59 @@ async function worker(t: Parameters<typeof fixture>[0], initial?: string) {
   const native = (name: string, args: Record<string, unknown> = {}) => call(`dsh_mcp__reference_memory__${name}`, args);
   return { ...f, client, call, native, file, options, status };
 }
+
+test('memory stops queued writes after a committed mutation loses its acknowledgement', async t => {
+  for (const fault of ['empty', 'mismatched', 'throw']) await t.test(fault, async t => {
+    const f = await fixture(t);
+    const file = path.join(f.root, 'memory.jsonl');
+    const context = new Context();
+    const prompt = await settleFiber(context.plugin(SystemPrompt));
+    const tools = await settleFiber(context.plugin(ToolRuntime, { mode: 'native' }));
+    t.after(async () => { await tools.dispose(); await prompt.dispose(); });
+    const prototype = Object.getPrototypeOf(context.tools);
+    const execute = prototype.execute;
+    let mutations = 0;
+    t.mock.method(prototype, 'execute', async function(this: unknown, input: {
+      name?: string; calls?: Array<{ name: string }>;
+    }) {
+      const result = await Reflect.apply(execute, this, [input]);
+      if ((input.calls?.[0]?.name ?? input.name) !== 'mcp__reference_memory__create_entities') return result;
+      mutations++;
+      if (mutations !== 1) return result;
+      // The real MCP server has committed the write before its reply is damaged.
+      if (fault === 'throw' || !input.calls) throw new Error('Submitted memory write lost its acknowledgement');
+      const batch = result as { results: object[] };
+      return { ...batch, results: fault === 'empty' ? []
+        : batch.results.map(entry => ({ ...entry, callId: 'another-memory-call' })) };
+    });
+    const config = resolveConfig({ workspaceRoot: f.workspace, memoryFilePath: file });
+    let runtime = await BridgeRuntime.create(config, () => {});
+    t.after(() => runtime.close());
+    const write = (name: string) => {
+      const input = { ...request(f.workspace, 'dsh_mcp__reference_memory__create_entities', {
+        entities: [{ name, entityType: 'test', observations: [] }],
+      }), permissions: [...ALL_PERMISSIONS] };
+      const grant = runtime.authorize(input);
+      return runtime.invoke({ ...input, authorization: grant.token });
+    };
+    await Promise.all([
+      assert.rejects(write('committed-once'), /acknowledgement|requested call result/),
+      assert.rejects(write('must-not-commit'), hasCode('MEMORY_BACKEND_FAILED')),
+    ]);
+    assert.equal(mutations, 1, 'The queued write must not enter an unconfirmed backend');
+    const before = await readFile(file, 'utf8');
+    assert.match(before, /committed-once/);
+    assert.doesNotMatch(before, /must-not-commit/);
+    await runtime.close();
+    runtime = await BridgeRuntime.create(config, () => {});
+    await write('after-reopen');
+    assert.equal(mutations, 2, 'Reopening must never replay the unacknowledged mutation');
+    const graph = await readFile(file, 'utf8');
+    assert.equal(graph.match(/committed-once/g)?.length, 1);
+    assert.match(graph, /after-reopen/);
+    assert.doesNotMatch(graph, /must-not-commit/);
+  });
+});
 
 test('memory preserves legacy JSONL and all nine native graph tool contracts', async t => {
   const f = await worker(t, JSON.stringify({ type: 'entity', name: 'legacy', entityType: 'person', observations: ['old preference'] }) + '\n');

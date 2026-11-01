@@ -82,7 +82,12 @@ async function execute(backend: Backend, name: string, args: JsonObject, invocat
   invocation.signal.throwIfAborted();
   if (backend.failed) throw new BridgeError('MEMORY_BACKEND_FAILED', 'Memory backend failed; disable and re-enable the component before another operation');
   // Do not send caller cancellation into a committed mutation and then release the queue early.
-  const result = await executeTool(backend.ctx.tools, { name, arguments: args, callId: ToolCallId(`${invocation.callId}:${randomUUID()}`), signal: new AbortController().signal });
+  const result = await executeTool(backend.ctx.tools, { name, arguments: args, callId: ToolCallId(`${invocation.callId}:${randomUUID()}`), signal: new AbortController().signal }).catch(error => {
+    // A rejected dispatch can follow a committed mutation with no trustworthy
+    // acknowledgement. Drain this call, but admit no further backend work.
+    backend.failed = true;
+    throw error;
+  });
   if (result.isError) {
     // ToolRuntime may erase transport error classes. Fail closed on every native error
     // rather than risk another write after an unacknowledged mutation. Never replay.
