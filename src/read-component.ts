@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { LocalFileSystem } from './adapters/dsh-filesystem.js';
 import { settleFiber, type CordisContext } from './adapters/dsh-cordis.js';
 import { SystemPrompt } from './adapters/dsh-search.js';
-import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
+import { executeTool, ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
 import { mountWorkingDirectory } from './adapters/dsh-working-directory.js';
 import { selectFsTools } from './fs-tool-subset.js';
 import { BridgeError, type ComponentModule } from './types.js';
@@ -30,7 +30,7 @@ export const dshReadComponent: ComponentModule<CordisContext> = {
         if (!ctx.fs.contains(root, target)) throw new BridgeError('PERMISSION_DENIED', 'Read path must remain inside the authorized workspace');
         invocation.progress('Reading workspace source');
         return observed.run({}, async (): Promise<ManagedReadResult> => {
-          const result = await ctx.tools.execute({ name: 'read', callId: ToolCallId(invocation.callId),
+          const result = await executeTool(ctx.tools, { name: 'read', callId: ToolCallId(invocation.callId),
             arguments: { ...args, file_path: ctx.fs.processPath(target) }, signal: invocation.signal });
           invocation.signal.throwIfAborted();
           const receipt = observed.getStore()?.receipt;

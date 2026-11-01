@@ -36,7 +36,10 @@ test('selects the matching working-directory runtime provider when a public DSH 
     devDependencies: { '@deepseek-ai/dsh-agent': 'file:.vendor/dsh/packages/core/agent' },
   };
   const required = new Set(['@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-agent', '@deepseek-ai/dsh-working-directory']);
-  const loadManifest = async () => { throw new Error('No non-DSH manifest expected'); };
+  const loadManifest = async relative => {
+    assert.equal(relative, 'packages/core/tools');
+    return { name: '@deepseek-ai/dsh-tools', version: '0.1.6-alpha.2' };
+  };
   const available = async (name, version) => {
     assert.equal(name, '@deepseek-ai/dsh-working-directory');
     assert.equal(version, '0.1.6-alpha.2');
@@ -71,6 +74,24 @@ allowBuilds:
   assert.match(selected, /overrides:\n  "@earendil-works\/pi-ai": "0\.85\.1"/);
   assert.match(selected, /"@deepseek-ai\/dsh-subprocess-local": true/);
   assert.match(selected, /patchedDependencies:/);
+});
+
+test('selects the matching native executor only for SDKs that split tool execution', async () => {
+  const input = { dependencies: { '@deepseek-ai/dsh-tools': 'file:.vendor/dsh/packages/core/tools' },
+    devDependencies: { '@deepseek-ai/dsh-agent': 'file:.vendor/dsh/packages/core/agent' } };
+  const required = new Set(['@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-agent']);
+  const version = '0.2.2-alpha.2';
+  const name = '@deepseek-ai/dsh-tool-executor-native';
+  const load = async source => source === 'packages/core/tools'
+    ? { devDependencies: { [name]: 'workspace:*' } } : { name, version };
+  const selected = await selectDshPackages(input, version, revision, load, required);
+  assert.equal(selected.manifest.dependencies[name], version);
+  assert.equal(selected.selected.at(-1).source, 'packages/core/tool-executor-native');
+  const legacy = await selectDshPackages(input, '0.2.1-rc.5', revision, async () => ({}), required);
+  assert.equal(legacy.manifest.dependencies[name], undefined);
+  await assert.rejects(selectDshPackages(input, version, revision,
+    async source => source === 'packages/core/tools' ? await load(source) : { name, version: '0.2.1-rc.5' }, required),
+  /native executor must match/);
 });
 
 test('rejects empty package selections and mutable revisions', async () => {
