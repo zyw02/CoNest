@@ -36,7 +36,10 @@ test('selects the matching working-directory runtime provider when a public DSH 
     devDependencies: { '@deepseek-ai/dsh-agent': 'file:.vendor/dsh/packages/core/agent' },
   };
   const required = new Set(['@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-agent', '@deepseek-ai/dsh-working-directory']);
-  const loadManifest = async () => { throw new Error('No non-DSH manifest expected'); };
+  const loadManifest = async relative => {
+    assert.equal(relative, 'packages/core/tools');
+    return { name: '@deepseek-ai/dsh-tools', version: '0.1.6-alpha.2' };
+  };
   const available = async (name, version) => {
     assert.equal(name, '@deepseek-ai/dsh-working-directory');
     assert.equal(version, '0.1.6-alpha.2');
