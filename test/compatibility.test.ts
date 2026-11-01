@@ -87,15 +87,33 @@ process.exit(23);
   await writeFile(path.join(bin, windows ? 'pnpm.cmd' : 'pnpm'), windows
     ? '@echo off\r\nnode "%CONEST_TEST_INSTALLER%" %*\r\n'
     : '#!/bin/sh\nexec node "$CONEST_TEST_INSTALLER" "$@"\n', { mode: 0o700 });
-  await assert.rejects(promisify(execFile)(process.execPath, [script, '2026.10.5'], {
-    cwd: f.root,
-    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`, CONEST_TEST_INSTALLER: installer },
-  }), /Command failed/);
-  const observed = JSON.parse(await readFile(path.join(f.root, 'installer-observation.json'), 'utf8'));
-  assert.ok(observed.args.includes('openclaw@2026.10.5'));
-  assert.match(observed.workspace, /"openclaw@2026\.10\.5>@openclaw\/fs-safe": "0\.26\.10"/);
-  assert.match(observed.workspace, /"existing-package": "1\.0\.0"/);
-  for (const [name, content] of originals) assert.equal(await readFile(path.join(f.root, name), 'utf8'), content, name);
+  const cases = [
+    ['2026.9.36', false],
+    ['2026.10.1', true],
+    ['2026.10.5', true],
+    ['2026.10.5-1', true],
+    ['2026.10.6', true],
+    ['2026.10.7', true],
+    ['2026.10.8', true],
+    ['2026.10.9', true],
+    ['2026.10.9-1', true],
+    ['2026.10.10', false],
+    ['2026.10.10-1', false],
+  ] as const;
+  for (const [version, overridden] of cases) await t.test(version, async () => {
+    await assert.rejects(promisify(execFile)(process.execPath, [script, version], {
+      cwd: f.root,
+      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`, CONEST_TEST_INSTALLER: installer },
+    }), /Command failed/);
+    const observed = JSON.parse(await readFile(path.join(f.root, 'installer-observation.json'), 'utf8'));
+    assert.ok(observed.args.includes(`openclaw@${version}`));
+    assert.ok(observed.args.includes(`@openclaw/deepseek-provider@${version.replace(/-\d+$/, '')}`));
+    const pin = `"openclaw@${version}>@openclaw/fs-safe": "0.26.10"`;
+    assert.equal(observed.workspace.includes(pin), overridden, version);
+    assert.equal([...observed.workspace.matchAll(/openclaw@[^"\n]+>@openclaw\/fs-safe/g)].length, overridden ? 1 : 0);
+    assert.match(observed.workspace, /"existing-package": "1\.0\.0"/);
+    for (const [name, content] of originals) assert.equal(await readFile(path.join(f.root, name), 'utf8'), content, `${version}: ${name}`);
+  });
 });
 
 test('handles prerelease DSH versions with an explicit adapter range', () => {
