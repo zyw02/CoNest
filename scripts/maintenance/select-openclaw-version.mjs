@@ -22,7 +22,7 @@ const compatibility = JSON.parse(readFileSync(new URL('../../compatibility.json'
 const semver = require('semver');
 const runtimeOverrides = Object.assign({}, ...(
   compatibility.adapters.openclaw.runtimeDependencyOverrides ?? []
-).filter(rule => semver.satisfies(version, rule.range)).map(rule => rule.dependencies));
+).filter(rule => semver.satisfies(version, rule.range, { includePrerelease: true })).map(rule => rule.dependencies));
 try {
   // The package is compiled against the frozen SDK before selecting the runtime
   // host. Installing a host must not rewrite release pins or qualification data.
