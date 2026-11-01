@@ -19,7 +19,7 @@
     "build": "tsc && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "pnpm run build && tsx --test test/*.test.ts && node --test test/*.test.mjs",
-    "test:dsh-matrix": "pnpm run build && tsx --test test/compatibility.test.ts test/component-contract.test.ts test/context-provider.test.ts test/dsh-harness.test.ts test/host-process.test.ts test/loader-runtime.test.ts test/memory.test.ts test/read.test.ts test/runtime.test.ts test/search.test.ts test/shared-host.test.ts",
+    "test:dsh-matrix": "pnpm run build && tsx --test test/compatibility.test.ts test/component-contract.test.ts test/context-provider.test.ts test/dsh-harness.test.ts test/dsh-tools.test.ts test/host-process.test.ts test/loader-runtime.test.ts test/memory.test.ts test/read.test.ts test/runtime.test.ts test/search.test.ts test/shared-host.test.ts",
     "test:openclaw": "pnpm run build && node scripts/test-openclaw.mjs",
     "test:e2e": "pnpm run build && node scripts/test-e2e.mjs",
     "test:loader": "node scripts/test-loader.mjs",

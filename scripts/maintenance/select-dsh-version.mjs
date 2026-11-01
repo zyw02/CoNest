@@ -32,6 +32,21 @@ export async function selectDshPackages(manifest, version, revision, loadManifes
     }
   }
   if (!selected.some(entry => entry.name === '@deepseek-ai/dsh-agent')) throw new Error('No DSH adapter packages were selected');
+  const tools = selected.find(entry => entry.name === '@deepseek-ai/dsh-tools');
+  if (tools) {
+    const metadata = await loadManifest(tools.source);
+    const name = '@deepseek-ai/dsh-tool-executor-native';
+    if (metadata?.devDependencies?.[name]) {
+      const source = 'packages/core/tool-executor-native';
+      const executor = await loadManifest(source);
+      if (executor.name !== name || executor.version !== version) {
+        throw new Error('DSH native executor must match the selected release');
+      }
+      output.dependencies ??= {};
+      output.dependencies[name] = version;
+      selected.push({ group: 'dependencies', name, version, source });
+    }
+  }
   return { manifest: output, selected };
 }
 

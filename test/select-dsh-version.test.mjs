@@ -52,6 +52,24 @@ allowBuilds:
   assert.match(selected, /patchedDependencies:/);
 });
 
+test('selects the matching native executor only for SDKs that split tool execution', async () => {
+  const input = { dependencies: { '@deepseek-ai/dsh-tools': 'file:.vendor/dsh/packages/core/tools' },
+    devDependencies: { '@deepseek-ai/dsh-agent': 'file:.vendor/dsh/packages/core/agent' } };
+  const required = new Set(['@deepseek-ai/dsh-tools', '@deepseek-ai/dsh-agent']);
+  const version = '0.2.2-alpha.2';
+  const name = '@deepseek-ai/dsh-tool-executor-native';
+  const load = async source => source === 'packages/core/tools'
+    ? { devDependencies: { [name]: 'workspace:*' } } : { name, version };
+  const selected = await selectDshPackages(input, version, revision, load, required);
+  assert.equal(selected.manifest.dependencies[name], version);
+  assert.equal(selected.selected.at(-1).source, 'packages/core/tool-executor-native');
+  const legacy = await selectDshPackages(input, '0.2.1-rc.5', revision, async () => ({}), required);
+  assert.equal(legacy.manifest.dependencies[name], undefined);
+  await assert.rejects(selectDshPackages(input, version, revision,
+    async source => source === 'packages/core/tools' ? await load(source) : { name, version: '0.2.1-rc.5' }, required),
+  /native executor must match/);
+});
+
 test('rejects empty package selections and mutable revisions', async () => {
   const input = { devDependencies: { '@deepseek-ai/dsh-agent': 'file:.vendor/dsh/packages/core/agent' } };
   await assert.rejects(

@@ -6,7 +6,7 @@ import {
 import type { Agent } from './adapters/dsh-agent.js';
 import { settleFiber, type CordisContext as Context } from './adapters/dsh-cordis.js';
 import { createDetachedSession, SessionId } from './adapters/dsh-session.js';
-import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
+import { executeTool, ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
 import { mountWorkingDirectory } from './adapters/dsh-working-directory.js';
 import { realpath } from 'node:fs/promises';
 import path from 'node:path';
@@ -71,7 +71,7 @@ async function executeSearch(ctx: Context, name: 'grep' | 'glob', args: JsonObje
     id, ctx, options: {}, status: 'idle',
     session: createDetachedSession(id, root),
   } as Agent : undefined;
-  const result = await ctx.tools.execute({
+  const result = await executeTool(ctx.tools, {
     callId: ToolCallId(invocation.callId), name, arguments: { ...args, path: target },
     ...(agent ? { agent } : {}), signal: invocation.signal,
   });
