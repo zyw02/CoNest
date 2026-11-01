@@ -1,6 +1,6 @@
 import { settleFiber, Context, type CordisContext, type Fiber } from './adapters/dsh-cordis.js';
 import { McpClient, SystemPrompt } from './adapters/dsh-memory.js';
-import { ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
+import { executeTool, ToolCallId, ToolRuntime } from './adapters/dsh-tools.js';
 import { mkdir, realpath, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -82,7 +82,12 @@ async function execute(backend: Backend, name: string, args: JsonObject, invocat
   invocation.signal.throwIfAborted();
   if (backend.failed) throw new BridgeError('MEMORY_BACKEND_FAILED', 'Memory backend failed; disable and re-enable the component before another operation');
   // Do not send caller cancellation into a committed mutation and then release the queue early.
-  const result = await backend.ctx.tools.execute({ name, arguments: args, callId: ToolCallId(`${invocation.callId}:${randomUUID()}`), signal: new AbortController().signal });
+  const result = await executeTool(backend.ctx.tools, { name, arguments: args, callId: ToolCallId(`${invocation.callId}:${randomUUID()}`), signal: new AbortController().signal }).catch(error => {
+    // A rejected dispatch can follow a committed mutation with no trustworthy
+    // acknowledgement. Drain this call, but admit no further backend work.
+    backend.failed = true;
+    throw error;
+  });
   if (result.isError) {
     // ToolRuntime may erase transport error classes. Fail closed on every native error
     // rather than risk another write after an unacknowledged mutation. Never replay.
